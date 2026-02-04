@@ -19,27 +19,27 @@ AI: Image recognition model, Large Language Models (LLMs), AI agent
 
 
 # Working 
-1.User uploads ingredient images and enters cooking time.
-2.AI detects ingredients from the images.
-3.An AI agent applies constraints such as time and preferences.
-4.LLM generates suitable recipes.
+1.User uploads ingredient images and enters cooking time.<br>
+2.AI detects ingredients from the images.<br>
+3.An AI agent applies constraints such as time and preferences.<br>
+4.LLM generates suitable recipes.<br>
 5.Recipes are displayed to the user for selection and sharing.
 
 # Features
--Image-based ingredient detection
--Time-based recipe recommendation
--AI-powered recipe generation
--Multi-recipe comparison
--Cuisine and regional adaptation
--Step-by-step cooking mode
--Voice-based instructions
--Difficulty level indication
--Dietary preference and allergy filtering
--Favorites, history, and recipe sharing
+-Image-based ingredient detection<br>
+-Time-based recipe recommendation<br>
+-AI-powered recipe generation<br>
+-Multi-recipe comparison<br>
+-Cuisine and regional adaptation<br>
+-Step-by-step cooking mode<br>
+-Voice-based instructions<br>
+-Difficulty level indication<br>
+-Dietary preference and allergy filtering<br>
+-Favorites, history, and recipe sharing<br>
 
 # Advantages
--Saves time and effort
--Reduces food wastage
+-Saves time and effort<br>
+-Reduces food wastage<br>
 -Personalized recommendations
 
 
