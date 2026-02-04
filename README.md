@@ -12,9 +12,9 @@ Existing platforms require manual ingredient input and lack intelligent personal
 This project addresses these issues using image-based ingredient detection and AI-driven recipe generation.
 
 # Technologies Used
-Frontend: React.js
-Backend: Node.js, Express.js
-Database: MongoDB
+Frontend: React.js<br>
+Backend: Node.js, Express.js<br>
+Database: MongoDB<br>
 AI: Image recognition model, Large Language Models (LLMs), AI agent
 
 
