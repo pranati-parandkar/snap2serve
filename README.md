@@ -41,6 +41,4 @@ AI: Image recognition model, Large Language Models (LLMs), AI agent
 -Saves time and effort<br>
 -Reduces food wastage<br>
 -Personalized recommendations
-
-
-Easy and user-friendly interface
+-Easy and user-friendly interface
