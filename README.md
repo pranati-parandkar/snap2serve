@@ -134,3 +134,100 @@ AI: Image recognition model, Large Language Models (LLMs), AI agent
 - Manages flagged content or issues  
 - Updates recipes or AI rules when required  
 
+## Roles & Interactions (Digital Pumpkin Model)
+
+The Digital Pumpkin Model represents the system as a layered digital ecosystem where each stakeholder (human and technical) interacts with the core AI system to deliver value to the end user.
+
+---
+
+### 1. End User (Home Cook / Student / Working Professional)
+**Role:** Consumer of the service  
+
+**Interactions:**
+- Uploads images of available ingredients
+- Enters cooking time and preferences
+- Receives AI-generated recipe recommendations
+- Uses step-by-step and voice-based cooking instructions
+- Saves, shares, and revisits favorite recipes
+
+---
+
+### 2. Frontend (React.js)
+**Role:** User interaction layer  
+
+**Interactions:**
+- Collects user inputs (images, time, preferences)
+- Displays detected ingredients and recommended recipes
+- Provides interactive cooking modes and UI feedback
+- Sends user requests to the backend API
+
+---
+
+### 3. Backend Server (Node.js + Express.js)
+**Role:** Control and communication layer  
+
+**Interactions:**
+- Receives requests from the frontend
+- Communicates with AI models and agents
+- Applies business logic and validation
+- Fetches and stores data in the database
+- Returns processed results to the frontend
+
+---
+
+### 4. Image Recognition Model
+**Role:** Perception layer  
+
+**Interactions:**
+- Processes uploaded ingredient images
+- Identifies and extracts ingredient information
+- Sends detected ingredients to the AI agent
+
+---
+
+### 5. AI Agent
+**Role:** Decision-making layer  
+
+**Interactions:**
+- Applies constraints such as cooking time, dietary preferences, and difficulty level
+- Filters and prioritizes recipe options
+- Coordinates with the LLM for final recipe generation
+
+---
+
+### 6. Large Language Model (LLM)
+**Role:** Intelligence and content generation layer  
+
+**Interactions:**
+- Generates detailed recipes based on detected ingredients and constraints
+- Provides step-by-step cooking instructions
+- Adapts recipes to regional cuisine and user preferences
+
+---
+
+### 7. Database (MongoDB)
+**Role:** Data persistence layer  
+
+**Interactions:**
+- Stores user profiles, preferences, and history
+- Maintains favorite and shared recipes
+- Supports personalization and recommendation continuity
+
+---
+
+### 8. System Administrator / Developer
+**Role:** Maintenance and optimization layer  
+
+**Interactions:**
+- Monitors system performance and uptime
+- Updates AI models and application features
+- Manages security, scalability, and bug fixes
+
+---
+
+### Digital Pumpkin Flow Summary
+1. User initiates request via the frontend.
+2. Backend coordinates with image recognition and AI components.
+3. AI agent and LLM generate personalized recipes.
+4. Results are stored and delivered back to the user.
+5. Continuous feedback improves personalization and performance.
