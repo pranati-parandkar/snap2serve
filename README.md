@@ -42,3 +42,95 @@ AI: Image recognition model, Large Language Models (LLMs), AI agent
 -Reduces food wastage<br>
 -Personalized recommendations
 -Easy and user-friendly interface
+
+## Stakeholders of Snap2Serve
+
+### 1. End Users (Home Cooks / Students / Working Professionals)
+**Role:** Primary users of the application  
+
+**Interests:**
+- Want quick recipe suggestions  
+- Use limited ingredients efficiently  
+- Save cooking time and reduce food wastage  
+
+**Interactions:**
+- Upload ingredient images  
+- Enter available cooking time  
+- View, save, and share recommended recipes  
+- Use voice-based and step-by-step cooking modes  
+
+---
+
+### 2. AI System (Image Recognition + LLM + AI Agent)
+**Role:** Core intelligence of the application  
+
+**Interest:** Accurate ingredient detection and recipe recommendation  
+
+**Interactions:**
+- Image recognition model detects ingredients from uploaded images  
+- AI agent applies constraints such as cooking time and user preferences  
+- Large Language Model (LLM) generates suitable recipes  
+
+---
+
+### 3. Application Developers
+**Role:** Designers and builders of Snap2Serve  
+
+**Interests:**
+- System performance  
+- Accuracy of recommendations  
+- Scalability of the application  
+
+**Interactions:**
+- Develop frontend and backend components  
+- Integrate AI and ML models  
+- Maintain and enhance application features  
+
+---
+
+### 4. System Administrator
+**Role:** Maintains the application  
+
+**Interest:** Smooth operation and system reliability  
+
+**Interactions:**
+- Manages servers and databases  
+- Monitors system errors and uptime  
+- Handles security patches and updates  
+
+---
+
+### 5. Database (MongoDB) – Technical Stakeholder
+**Role:** Data storage system  
+
+**Interest:** Secure and efficient data handling  
+
+**Interactions:**
+- Stores user profiles and preferences  
+- Maintains favorites, history, and recipe data  
+- Supports personalized recommendations  
+
+---
+
+### 6. Cloud / Hosting Service Provider
+**Role:** Infrastructure provider  
+
+**Interest:** Application availability and performance  
+
+**Interactions:**
+- Hosts frontend, backend, and AI services  
+- Manages deployment and scalability  
+- Ensures reliable access to the application  
+
+---
+
+### 7. Admin / Moderator (Optional)
+**Role:** Content and system oversight  
+
+**Interest:** Quality control and user experience  
+
+**Interactions:**
+- Monitors application usage  
+- Manages flagged content or issues  
+- Updates recipes or AI rules when required  
+
