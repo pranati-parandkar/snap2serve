@@ -1,4 +1,4 @@
-this is our project Snap2Serve
+Snap2Serve
 AI-Based Recipe Recommendation Web Application
 
 About the Project
