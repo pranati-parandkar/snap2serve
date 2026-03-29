@@ -6,6 +6,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 import bcrypt from "bcryptjs";
 
+function isStrongPassword(password: string) {
+  const regex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
+  return regex.test(password);
+}
+
 import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
@@ -56,7 +61,7 @@ const UserSchema = new mongoose.Schema({
 const User = mongoose.model("User", UserSchema);
 
 // API Routes
-
+ //🔐 Authentication Routes
 // Login
 app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
@@ -86,11 +91,20 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// Signup
 app.post("/api/auth/signup", async (req, res) => {
   const { username, email, password } = req.body;
   console.log("Signup attempt for:", username, email);
+
   try {
+    const strongRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
+
+    // ✅ FIX: properly closed block
+    if (!strongRegex.test(password)) {
+      return res.status(400).json({
+        error: "Password must be at least 8 characters, include 1 uppercase, 1 number, and 1 special character"
+      });
+    }
+
     const existingUser = await User.findOne({ 
       $or: [{ username }, { email }] 
     });
@@ -101,6 +115,7 @@ app.post("/api/auth/signup", async (req, res) => {
     }
     
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const user = new User({ 
       username, 
       email, 
@@ -110,14 +125,15 @@ app.post("/api/auth/signup", async (req, res) => {
     });
     
     await user.save();
+
     console.log("Signup successful for:", username);
     res.json({ username: user.username, email: user.email });
+
   } catch (error) {
     console.error("Signup error:", error);
     res.status(500).json({ error: "Signup failed" });
   }
 });
-
 // Get User Data (Favorites & History)
 app.get("/api/user/data", async (req, res) => {
   const { username } = req.query;
