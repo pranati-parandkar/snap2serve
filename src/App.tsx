@@ -169,7 +169,7 @@ export default function App() {
   const toggleFavorite = async (recipe: Recipe) => {
     if (!recipe || !recipe.id) return;
     if (!user) {
-      alert("Please login to save favorites! 💖");
+      alert("Please login to save favorites! ");
       setIsLoginOpen(true);
       return;
     }
