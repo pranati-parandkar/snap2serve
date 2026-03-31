@@ -5,7 +5,7 @@ import {
   Upload, 
   Clock, 
   ChefHat, 
-  Utensils, 
+  Utensils,
   Volume2, 
   ArrowLeft, 
   CheckCircle2, 
@@ -89,7 +89,12 @@ export default function App() {
   const [isSignup, setIsSignup] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [user, setUser] = useState<{ username: string; email: string } | null>(null);
-  const [loginForm, setLoginForm] = useState({ username: '', email: '', password: '' });
+  const [loginForm, setLoginForm] = useState({ 
+  username: '', 
+  email: '', 
+  password: '', 
+  confirmPassword: '' 
+  });
   const passwordStrength = getPasswordStrength(loginForm.password);
   const [showRating, setShowRating] = useState(false);
   const [rating, setRating] = useState(0);
@@ -977,6 +982,34 @@ const [preferences, setPreferences] = useState<UserPreferences>({
                   />
                 </div>
               </div>
+
+              {/* ✅ ADD THIS BELOW PASSWORD */}
+{isSignup && (
+  <div className="space-y-2">
+    <label className="text-sm font-bold text-brand-800 ml-2">Confirm Password</label>
+    <div className="relative">
+      <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" />
+      <input 
+        type="password"
+        value={loginForm.confirmPassword}
+        onChange={(e) => setLoginForm({...loginForm, confirmPassword: e.target.value})}
+      />
+    </div>
+
+    {/* Match check */}
+    {loginForm.confirmPassword && (
+      <p className={`text-sm ml-2 ${
+        loginForm.password === loginForm.confirmPassword 
+          ? "text-green-500" 
+          : "text-red-500"
+      }`}>
+        {loginForm.password === loginForm.confirmPassword 
+          ? "Passwords match ✅" 
+          : "Passwords do not match ❌"}
+      </p>
+    )}
+  </div>
+)}
               {loginForm.password && (
   <div className="mt-2 ml-2">
     <p className={`text-sm font-bold ${passwordStrength.color}`}>
@@ -989,6 +1022,10 @@ const [preferences, setPreferences] = useState<UserPreferences>({
 )}
 
               <button 
+                if (isSignup && loginForm.password !== loginForm.confirmPassword) {
+  alert("Passwords do not match!");
+  return;
+}
                 onClick={async () => {
                   const endpoint = isSignup ? "/api/auth/signup" : "/api/auth/login";
                   setAuthLoading(true);
