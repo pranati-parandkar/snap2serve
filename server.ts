@@ -32,9 +32,6 @@ mongoose.connect(MONGODB_URI)
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-/* =========================
-   SCHEMAS
-========================= */
 
 const RecipeSchema = new mongoose.Schema({
   id: String,
