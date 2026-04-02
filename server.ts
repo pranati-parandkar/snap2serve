@@ -93,12 +93,24 @@ app.post("/api/auth/signup", async (req, res) => {
 const { username, email, password, confirmPassword } = req.body;
   try {
     const strongRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
-
+     // ✅ Password strength check
     if (!strongRegex.test(password)) {
       return res.status(400).json({
         error: "Password must be strong"
       });
     }
+
+    // ✅ Confirm password check
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        error: "Passwords do not match"
+      });
+    }
+
+
+
+
+ 
 
     const existingUser = await User.findOne({ 
       $or: [{ username }, { email }] 
