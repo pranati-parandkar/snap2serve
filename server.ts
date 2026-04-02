@@ -90,8 +90,7 @@ app.post("/api/auth/login", async (req, res) => {
 
 // Signup
 app.post("/api/auth/signup", async (req, res) => {
-  const { username, email, password } = req.body;
-
+const { username, email, password, confirmPassword } = req.body;
   try {
     const strongRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
 
