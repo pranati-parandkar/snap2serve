@@ -290,13 +290,13 @@ export default function App() {
         );
 
         const isAdminEmail = (email: string | null) => {
-          return email === 'pranati.parandkar@gmail.com' || email === 'abc@hotmail.com';
+          return email === 'pranati.parandkar@gmail.com' || email === 'palaijharana98@gmail.com';
         };
 
         if (!userDoc.exists() || needsRepair || (isAdminEmail(firebaseUser.email) && (userData?.role !== 'admin'))) {
           const updatedUser = {
             username: firebaseUser.email === 'pranati.parandkar@gmail.com' ? 'Pranati' : 
-                      (firebaseUser.email === 'abc@hotmail.com' ? 'Admin ABC' : 
+                      (firebaseUser.email === 'palaijharana98@gmail.com' ? 'Admin ABC' : 
                       (userData?.username || firebaseUser.displayName || 'Chef')),
             email: userData?.email || firebaseUser.email || '',
             role: isAdminEmail(firebaseUser.email) ? 'admin' : (userData?.role || 'client'),
@@ -434,7 +434,7 @@ export default function App() {
     if (step === 'analytics') {
       const fetchAnalytics = async () => {
         // Only admins should be able to fetch analytics
-        const isAdmin = user?.role === 'admin' || user?.email === 'pranati.parandkar@gmail.com' || user?.email === 'abc@hotmail.com';
+        const isAdmin = user?.role === 'admin' || user?.email === 'pranati.parandkar@gmail.com' || user?.email === 'palaijharana98@gmail.com';
         if (!isAdmin) {
           setStep('home');
           return;
@@ -2114,7 +2114,7 @@ export default function App() {
             <Heart className={cn("w-4 h-4", favorites.length > 0 && "fill-cute-pink text-cute-pink")} />
             Favorites ({favorites.length})
           </button>
-          { (user?.role === 'admin' || user?.email === 'pranati.parandkar@gmail.com' || user?.email === 'abc@hotmail.com') && (
+          { (user?.role === 'admin' || user?.email === 'pranati.parandkar@gmail.com' || user?.email === 'palaijharana98@gmail.com') && (
             <button 
               onClick={() => setStep('analytics')}
               className={cn(
