@@ -1354,20 +1354,20 @@ export default function App() {
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="relative bg-white w-full max-w-md rounded-[3.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh] border-8 border-white"
+            className="relative bg-white w-full max-w-md rounded-[3.5rem] shadow-2xl max-h-[90vh] border-8 border-white flex flex-col overflow-hidden"
           >
-            <div className="absolute top-0 left-0 w-full h-3 bg-cute-pink" />
+            <div className="absolute top-0 left-0 w-full h-3 bg-cute-pink z-20" />
             <button 
               onClick={() => {
                 setIsLoginOpen(false);
                 setIsSignup(false);
                 setLoginForm({ username: '', email: '', password: '', confirmPassword: '', dob: '' });
               }}
-              className="absolute top-6 right-6 p-2 hover:bg-brand-50 rounded-xl transition-colors"
+              className="absolute top-6 right-6 p-2 hover:bg-brand-50 rounded-xl transition-colors z-20"
             >
               <X className="w-6 h-6 text-brand-400" />
             </button>
-
+          <div className="overflow-y-auto p-10 pt-16 flex-1 custom-scrollbar">
             <div className="text-center mb-10">
               <div className="w-20 h-20 bg-cute-pink/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
                 <ChefHat className="w-10 h-10 text-cute-pink" />
@@ -1663,6 +1663,7 @@ export default function App() {
                   {isSignup ? "Sign In" : "Sign Up"}
                 </button>
               </p>
+              </div>
             </div>
           </motion.div>
         </div>
