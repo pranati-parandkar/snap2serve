@@ -944,7 +944,7 @@ export default function App() {
               <div>
                 <label className="text-sm font-bold text-brand-500 mb-2 block">Cuisine Style? 🌎</label>
                 <div className="flex flex-wrap gap-2">
-                  {['Any', 'Mexican', 'Indian', 'Italian', 'Chinese', 'Japanese'].map(cuisine => (
+                  {['Any', 'Mexican', 'Indian', 'Italian', 'Japanese'].map(cuisine => (
                     <button
                       key={cuisine}
                       onClick={() => setPreferences({ ...preferences, cuisine: cuisine === 'Any' ? undefined : cuisine })}
@@ -1737,7 +1737,7 @@ export default function App() {
   };
 
   const renderExplore = () => {
-    const cuisines = ['Mexican', 'Indian', 'Italian', 'Chinese', 'Japanese'];
+    const cuisines = ['Mexican', 'Indian', 'Italian', 'Japanese'];
     const recipeTemplates = [
       { 
         title: "Spicy {cuisine} Bowl", 
