@@ -47,6 +47,7 @@ import {
   Users,
   Timer,
   Carrot,
+  Bot,
   Cherry,
   Apple,
   Citrus,
@@ -78,6 +79,7 @@ import {
 import { Recipe, Ingredient, UserPreferences, Session, AnalyticsData } from './types';
 import { detectIngredients, generateRecipes, generateSpeech } from './services/geminiService';
 import { fetchRecipeImage } from './services/pixabayService';
+import { ChatBot } from './components/ChatBot';
 import { cn } from './lib/utils';
 import { auth, db } from './firebase';
 import { 
@@ -292,13 +294,13 @@ export default function App() {
         );
 
         const isAdminEmail = (email: string | null) => {
-          return email === 'pranati.parandkar@gmail.com' || email === 'palaijharana98@gmail.com';
+          return email === 'pranati.parandkar@gmail.com' || email === 'abc@hotmail.com';
         };
 
         if (!userDoc.exists() || needsRepair || (isAdminEmail(firebaseUser.email) && (userData?.role !== 'admin'))) {
           const updatedUser = {
             username: firebaseUser.email === 'pranati.parandkar@gmail.com' ? 'Pranati' : 
-                      (firebaseUser.email === 'palaijharana98@gmail.com' ? 'Admin ABC' : 
+                      (firebaseUser.email === 'abc@hotmail.com' ? 'Admin ABC' : 
                       (userData?.username || firebaseUser.displayName || 'Chef')),
             email: userData?.email || firebaseUser.email || '',
             role: isAdminEmail(firebaseUser.email) ? 'admin' : (userData?.role || 'client'),
@@ -355,14 +357,14 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Visitor Tracking
   useEffect(() => {
     let visitorId = localStorage.getItem('snap2serve_visitor_id');
-  
     if (!visitorId) {
       visitorId = 'visitor_' + Math.random().toString(36).substring(2, 15);
       localStorage.setItem('snap2serve_visitor_id', visitorId);
     }
-  
+
     const startSession = async () => {
       try {
         const sessionDoc = await addDoc(collection(db, 'sessions'), {
@@ -371,33 +373,23 @@ export default function App() {
           startTime: new Date().toISOString(),
           createdAt: serverTimestamp()
         });
-  
         sessionRef.current = sessionDoc.id;
-  
-        // ✅ MongoDB call
-        await fetch("http://localhost:3000/api/visit", {
-          method: "POST",
-        });
-  
       } catch (error) {
         console.error("Failed to start session", error);
       }
     };
-  
+
+    startSession();
+
     const endSession = async () => {
       if (sessionRef.current) {
         const endTime = new Date();
         const sessionDocRef = doc(db, 'sessions', sessionRef.current);
-  
         try {
           const sessionSnap = await getDoc(sessionDocRef);
-  
           if (sessionSnap.exists()) {
             const startTime = new Date(sessionSnap.data().startTime);
-            const duration = Math.floor(
-              (endTime.getTime() - startTime.getTime()) / 1000
-            );
-  
+            const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
             await updateDoc(sessionDocRef, {
               endTime: endTime.toISOString(),
               duration: duration
@@ -408,35 +400,29 @@ export default function App() {
         }
       }
     };
-  
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         endSession();
       }
     };
-  
-    // ▶ START SESSION
-    startSession();
-  
-    // ▶ ADD LISTENERS
+
     window.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', endSession);
-  
-    // ▶ CLEANUP
+
     return () => {
       window.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', endSession);
       endSession();
     };
-  
-  }, [auth.currentUser?.uid]);
+  }, []);
 
   // Fetch Analytics
   useEffect(() => {
     if (step === 'analytics') {
       const fetchAnalytics = async () => {
         // Only admins should be able to fetch analytics
-        const isAdmin = user?.role === 'admin' || user?.email === 'pranati.parandkar@gmail.com' || user?.email === 'palaijharana98@gmail.com';
+        const isAdmin = user?.role === 'admin' || user?.email === 'pranati.parandkar@gmail.com' || user?.email === 'abc@hotmail.com';
         if (!isAdmin) {
           setStep('home');
           return;
@@ -514,6 +500,7 @@ export default function App() {
       NON_VEGAN_KEYWORDS.some(keyword => ing.name.toLowerCase().includes(keyword))
     );
   };
+
   useEffect(() => {
     const initializeExplore = async () => {
       const cuisines = ['Mexican', 'Indian', 'Italian', 'Chinese', 'Japanese'];
@@ -619,7 +606,6 @@ export default function App() {
 
     initializeExplore();
   }, []);
-
 
   useEffect(() => {
     if (!isVeganPossible() && preferences.dietaryRestrictions.includes('Vegan')) {
@@ -742,6 +728,8 @@ export default function App() {
     try {
       const ingredientNames = detectedIngredients.map(i => i.name);
       const generated = await generateRecipes(ingredientNames, preferences);
+      
+      // Fetch images for each recipe in parallel
       const recipesWithImages = await Promise.all(generated.map(async (recipe, index) => {
         const imageUrl = await fetchRecipeImage(recipe.title);
         return {
@@ -1056,7 +1044,7 @@ export default function App() {
               <div>
                 <label className="text-sm font-bold text-brand-500 mb-2 block">Cuisine Style? 🌎</label>
                 <div className="flex flex-wrap gap-2">
-                  {['Any', 'Mexican', 'Indian', 'Italian', 'Japanese'].map(cuisine => (
+                  {['Any', 'Mexican', 'Indian', 'Italian', 'Chinese', 'Japanese'].map(cuisine => (
                     <button
                       key={cuisine}
                       onClick={() => setPreferences({ ...preferences, cuisine: cuisine === 'Any' ? undefined : cuisine })}
@@ -1200,7 +1188,7 @@ export default function App() {
           <div className="lg:col-span-2">
             <div className="relative h-[450px] rounded-[3.5rem] overflow-hidden mb-10 shadow-2xl border-8 border-white">
               <img 
-                src={selectedRecipe.imageUrl || `https://picsum.photos/seed/${selectedRecipe.id}/1200/800`}
+                src={selectedRecipe.imageUrl || `https://picsum.photos/seed/${selectedRecipe.id}/1200/800`} 
                 alt={selectedRecipe.title} 
                 className="w-full h-full object-cover"
               />
@@ -1290,6 +1278,17 @@ export default function App() {
               >
                 <Play className="w-5 h-5" />
                 Start Cooking!
+              </button>
+
+              <button 
+                onClick={() => {
+                  const event = new CustomEvent('open-chatbot', { detail: `I have a question about the ${selectedRecipe.title} recipe.` });
+                  window.dispatchEvent(event);
+                }}
+                className="w-full mt-4 bg-cute-blue text-white py-5 rounded-full font-bold text-lg flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-lg"
+              >
+                <Bot className="w-5 h-5" />
+                Ask AI about this recipe
               </button>
             </div>
           </div>
@@ -1479,302 +1478,303 @@ export default function App() {
             >
               <X className="w-6 h-6 text-brand-400" />
             </button>
-          <div className="overflow-y-auto p-10 pt-16 flex-1 custom-scrollbar">
-            <div className="text-center mb-10">
-              <div className="w-20 h-20 bg-cute-pink/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                <ChefHat className="w-10 h-10 text-cute-pink" />
-              </div>
-              <h2 className="text-4xl font-display text-brand-950 mb-2">
-                {isSignup ? "Join Us!" : "Welcome Back!"}
-              </h2>
-              <p className="text-brand-500 font-medium">
-                {isSignup ? "Create your chef profile" : "Join the Snap2Serve family"}
-              </p>
-            </div>
 
-            <div className="space-y-6">
-              {resetSent && (
-                <motion.div 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-4 bg-green-50 border-2 border-green-100 rounded-2xl flex items-center gap-3 text-green-600 text-sm font-bold"
-                >
-                  <ShieldCheck className="w-5 h-5 flex-shrink-0" />
-                  Password reset email sent! Check your inbox. 📧
-                </motion.div>
-              )}
-              {authError && (
-                <motion.div 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-4 bg-red-50 border-2 border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold"
-                >
-                  <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-                  {authError}
-                </motion.div>
-              )}
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-brand-800 ml-2">
-                  {isSignup ? "Username" : "Email Address"}
-                </label>
-                <div className="relative">
-                  {isSignup ? <User className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" /> : <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" />}
-                  <input 
-                    type="text" 
-                    placeholder={isSignup ? "ChefYummy" : "hello@yummy.com"}
-                    value={loginForm.username}
-                    onChange={(e) => setLoginForm({...loginForm, username: e.target.value})}
-                    className="w-full pl-14 pr-6 py-4 bg-brand-50 border-2 border-transparent focus:border-cute-pink focus:bg-white rounded-2xl outline-none transition-all font-medium"
-                  />
+            <div className="overflow-y-auto p-10 pt-16 flex-1 custom-scrollbar">
+              <div className="text-center mb-10">
+                <div className="w-20 h-20 bg-cute-pink/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                  <ChefHat className="w-10 h-10 text-cute-pink" />
                 </div>
+                <h2 className="text-4xl font-display text-brand-950 mb-2">
+                  {isSignup ? "Join Us!" : "Welcome Back!"}
+                </h2>
+                <p className="text-brand-500 font-medium">
+                  {isSignup ? "Create your chef profile" : "Join the Snap2Serve family"}
+                </p>
               </div>
 
-              {isSignup && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-brand-800 ml-2">Email Address</label>
-                    <div className="relative">
-                      <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" />
-                      <input 
-                        type="email" 
-                        placeholder="hello@yummy.com"
-                        value={loginForm.email}
-                        onChange={(e) => setLoginForm({...loginForm, email: e.target.value})}
-                        className="w-full pl-14 pr-6 py-4 bg-brand-50 border-2 border-transparent focus:border-cute-pink focus:bg-white rounded-2xl outline-none transition-all font-medium"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-brand-800 ml-2">Date of Birth</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" />
-                      <input 
-                        type="date" 
-                        value={loginForm.dob}
-                        onChange={(e) => setLoginForm({...loginForm, dob: e.target.value})}
-                        className="w-full pl-14 pr-6 py-4 bg-brand-50 border-2 border-transparent focus:border-cute-pink focus:bg-white rounded-2xl outline-none transition-all font-medium"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-brand-800 ml-2">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" />
-                  <input 
-                    type={showPassword ? "text" : "password"} 
-                    placeholder="••••••••"
-                    value={loginForm.password}
-                    onPaste={(e) => e.preventDefault()}
-                    onCopy={(e) => e.preventDefault()}
-                    onCut={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onDrop={(e) => e.preventDefault()}
-                    autoComplete="new-password"
-                    onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
-                    className="w-full pl-14 pr-14 py-4 bg-brand-50 border-2 border-transparent focus:border-cute-pink focus:bg-white rounded-2xl outline-none transition-all font-medium"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-5 top-1/2 -translate-y-1/2 p-1 hover:bg-brand-100 rounded-lg transition-colors"
+              <div className="space-y-6">
+                {resetSent && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 bg-green-50 border-2 border-green-100 rounded-2xl flex items-center gap-3 text-green-600 text-sm font-bold"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5 text-brand-400" /> : <Eye className="w-5 h-5 text-brand-400" />}
-                  </button>
-                </div>
-
-                {!isSignup && (
-                  <div className="flex justify-end mt-2">
-                    <button 
-                      onClick={async () => {
-                        if (!loginForm.username) {
-                          setAuthError("Please enter your email address first! 📧");
-                          return;
-                        }
-                        if (!isValidEmail(loginForm.username)) {
-                          setAuthError("Please enter a valid email address! 📧");
-                          return;
-                        }
-                        try {
-                          await sendPasswordResetEmail(auth, loginForm.username);
-                          setResetSent(true);
-                          setAuthError(null);
-                          setTimeout(() => setResetSent(false), 5000);
-                        } catch (error: any) {
-                          console.error("Reset error", error);
-                          setAuthError("Failed to send reset email. Please try again.");
-                        }
-                      }}
-                      className="text-xs font-bold text-cute-pink hover:underline"
-                    >
-                      Forgot Password?
-                    </button>
-                  </div>
+                    <ShieldCheck className="w-5 h-5 flex-shrink-0" />
+                    Password reset email sent! Check your inbox. 📧
+                  </motion.div>
                 )}
+                {authError && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 bg-red-50 border-2 border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold"
+                  >
+                    <ShieldAlert className="w-5 h-5 flex-shrink-0" />
+                    {authError}
+                  </motion.div>
+                )}
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-brand-800 ml-2">
+                    {isSignup ? "Username" : "Email Address"}
+                  </label>
+                  <div className="relative">
+                    {isSignup ? <User className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" /> : <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" />}
+                    <input 
+                      type="text" 
+                      placeholder={isSignup ? "ChefYummy" : "hello@yummy.com"}
+                      value={loginForm.username}
+                      onChange={(e) => setLoginForm({...loginForm, username: e.target.value})}
+                      className="w-full pl-14 pr-6 py-4 bg-brand-50 border-2 border-transparent focus:border-cute-pink focus:bg-white rounded-2xl outline-none transition-all font-medium"
+                    />
+                  </div>
+                </div>
 
                 {isSignup && (
-                  <div className="space-y-2 mt-4">
-                    <label className="text-sm font-bold text-brand-800 ml-2">Confirm Password</label>
-                    <div className="relative">
-                      <Shield className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" />
-                      <input 
-                        type={showPassword ? "text" : "password"} 
-                        placeholder="••••••••"
-                        value={loginForm.confirmPassword}
-                        onPaste={(e) => e.preventDefault()}
-                        onCopy={(e) => e.preventDefault()}
-                        onCut={(e) => e.preventDefault()}
-                        onDragStart={(e) => e.preventDefault()}
-                        onDrop={(e) => e.preventDefault()}
-                        onChange={(e) => setLoginForm({...loginForm, confirmPassword: e.target.value})}
-                        className="w-full pl-14 pr-6 py-4 bg-brand-50 border-2 border-transparent focus:border-cute-pink focus:bg-white rounded-2xl outline-none transition-all font-medium"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {loginForm.password && (
-                  <div className="mt-4 space-y-3 p-4 bg-brand-50 rounded-2xl border border-brand-100">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-brand-500 uppercase tracking-wider">Strength</span>
-                      <span className={cn("text-xs font-bold uppercase tracking-wider", getPasswordStrength(loginForm.password).color)}>
-                        {getPasswordStrength(loginForm.password).label}
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-full bg-brand-200 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(getPasswordStrength(loginForm.password).score / 5) * 100}%` }}
-                        className={cn("h-full transition-all duration-500", 
-                          getPasswordStrength(loginForm.password).score <= 2 ? "bg-red-500" : 
-                          getPasswordStrength(loginForm.password).score <= 4 ? "bg-yellow-500" : "bg-green-500"
-                        )}
-                      />
-                    </div>
-                    {isSignup && (
-                      <div className="grid grid-cols-1 gap-2 mt-4">
-                        {getPasswordRequirements(loginForm.password).map((req, idx) => (
-                          <div key={idx} className="flex items-center gap-2">
-                            {req.met ? (
-                              <ShieldCheck className="w-4 h-4 text-green-500" />
-                            ) : (
-                              <ShieldAlert className="w-4 h-4 text-brand-300" />
-                            )}
-                            <span className={cn("text-xs font-medium", req.met ? "text-green-600" : "text-brand-400")}>
-                              {req.label}
-                            </span>
-                          </div>
-                        ))}
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-brand-800 ml-2">Email Address</label>
+                      <div className="relative">
+                        <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" />
+                        <input 
+                          type="email" 
+                          placeholder="hello@yummy.com"
+                          value={loginForm.email}
+                          onChange={(e) => setLoginForm({...loginForm, email: e.target.value})}
+                          className="w-full pl-14 pr-6 py-4 bg-brand-50 border-2 border-transparent focus:border-cute-pink focus:bg-white rounded-2xl outline-none transition-all font-medium"
+                        />
                       </div>
-                    )}
-                  </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-brand-800 ml-2">Date of Birth</label>
+                      <div className="relative">
+                        <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" />
+                        <input 
+                          type="date" 
+                          value={loginForm.dob}
+                          onChange={(e) => setLoginForm({...loginForm, dob: e.target.value})}
+                          className="w-full pl-14 pr-6 py-4 bg-brand-50 border-2 border-transparent focus:border-cute-pink focus:bg-white rounded-2xl outline-none transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+                  </>
                 )}
-              </div>
 
-              <button 
-                onClick={async () => {
-                  setAuthError(null);
-                  // Security Restrictions (Applies to both Login and Signup)
-                  if (loginForm.password && loginForm.username && loginForm.password === loginForm.username) {
-                    setAuthError("Password cannot be the same as username! 🛡️");
-                    return;
-                  }
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-brand-800 ml-2">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" />
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      placeholder="••••••••"
+                      value={loginForm.password}
+                      onPaste={(e) => e.preventDefault()}
+                      onCopy={(e) => e.preventDefault()}
+                      onCut={(e) => e.preventDefault()}
+                      onDragStart={(e) => e.preventDefault()}
+                      onDrop={(e) => e.preventDefault()}
+                      autoComplete="new-password"
+                      onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
+                      className="w-full pl-14 pr-14 py-4 bg-brand-50 border-2 border-transparent focus:border-cute-pink focus:bg-white rounded-2xl outline-none transition-all font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 p-1 hover:bg-brand-100 rounded-lg transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5 text-brand-400" /> : <Eye className="w-5 h-5 text-brand-400" />}
+                    </button>
+                  </div>
 
-                  if (isSignup) {
-                    if (!loginForm.email || !loginForm.username || !loginForm.password) {
-                      setAuthError("Please fill in all required fields! 🍳");
-                      return;
-                    }
+                  {!isSignup && (
+                    <div className="flex justify-end mt-2">
+                      <button 
+                        onClick={async () => {
+                          if (!loginForm.username) {
+                            setAuthError("Please enter your email address first! 📧");
+                            return;
+                          }
+                          if (!isValidEmail(loginForm.username)) {
+                            setAuthError("Please enter a valid email address! 📧");
+                            return;
+                          }
+                          try {
+                            await sendPasswordResetEmail(auth, loginForm.username);
+                            setResetSent(true);
+                            setAuthError(null);
+                            setTimeout(() => setResetSent(false), 5000);
+                          } catch (error: any) {
+                            console.error("Reset error", error);
+                            setAuthError("Failed to send reset email. Please try again.");
+                          }
+                        }}
+                        className="text-xs font-bold text-cute-pink hover:underline"
+                      >
+                        Forgot Password?
+                      </button>
+                    </div>
+                  )}
 
-                    if (!isValidEmail(loginForm.email)) {
-                      setAuthError("Please enter a valid email address! 📧");
-                      return;
-                    }
+                  {isSignup && (
+                    <div className="space-y-2 mt-4">
+                      <label className="text-sm font-bold text-brand-800 ml-2">Confirm Password</label>
+                      <div className="relative">
+                        <Shield className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300" />
+                        <input 
+                          type={showPassword ? "text" : "password"} 
+                          placeholder="••••••••"
+                          value={loginForm.confirmPassword}
+                          onPaste={(e) => e.preventDefault()}
+                          onCopy={(e) => e.preventDefault()}
+                          onCut={(e) => e.preventDefault()}
+                          onDragStart={(e) => e.preventDefault()}
+                          onDrop={(e) => e.preventDefault()}
+                          onChange={(e) => setLoginForm({...loginForm, confirmPassword: e.target.value})}
+                          className="w-full pl-14 pr-6 py-4 bg-brand-50 border-2 border-transparent focus:border-cute-pink focus:bg-white rounded-2xl outline-none transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+                  )}
 
-                    if (loginForm.dob && loginForm.password.includes(loginForm.dob.replace(/-/g, ''))) {
-                      setAuthError("Password should not contain your birth date! 🛡️");
-                      return;
-                    }
-                    
-                    if (loginForm.password !== loginForm.confirmPassword) {
-                      setAuthError("Passwords do not match! 🛡️");
-                      return;
-                    }
+                  {loginForm.password && (
+                    <div className="mt-4 space-y-3 p-4 bg-brand-50 rounded-2xl border border-brand-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-brand-500 uppercase tracking-wider">Strength</span>
+                        <span className={cn("text-xs font-bold uppercase tracking-wider", getPasswordStrength(loginForm.password).color)}>
+                          {getPasswordStrength(loginForm.password).label}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-brand-200 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(getPasswordStrength(loginForm.password).score / 5) * 100}%` }}
+                          className={cn("h-full transition-all duration-500", 
+                            getPasswordStrength(loginForm.password).score <= 2 ? "bg-red-500" : 
+                            getPasswordStrength(loginForm.password).score <= 4 ? "bg-yellow-500" : "bg-green-500"
+                          )}
+                        />
+                      </div>
+                      {isSignup && (
+                        <div className="grid grid-cols-1 gap-2 mt-4">
+                          {getPasswordRequirements(loginForm.password).map((req, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              {req.met ? (
+                                <ShieldCheck className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <ShieldAlert className="w-4 h-4 text-brand-300" />
+                              )}
+                              <span className={cn("text-xs font-medium", req.met ? "text-green-600" : "text-brand-400")}>
+                                {req.label}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-                    const passwordError = validatePassword(loginForm.password);
-                    if (passwordError) {
-                      setAuthError(passwordError + " 🛡️");
-                      return;
-                    }
-                  } else {
-                    if (!loginForm.username || !loginForm.password) {
-                      setAuthError("Please enter your email and password! 🍳");
-                      return;
-                    }
-                    if (!isValidEmail(loginForm.username)) {
-                      setAuthError("Please enter a valid email address! 📧");
-                      return;
-                    }
-                  }
-
-                  setAuthLoading(true);
-                  try {
-                    if (isSignup) {
-                      const userCredential = await createUserWithEmailAndPassword(auth, loginForm.email, loginForm.password);
-                      await updateProfile(userCredential.user, { displayName: loginForm.username });
-                      
-                      // Create user document in Firestore
-                      await setDoc(doc(db, 'users', userCredential.user.uid), {
-                        username: loginForm.username,
-                        email: loginForm.email,
-                        dob: loginForm.dob,
-                        favorites: [],
-                        history: [],
-                        createdAt: serverTimestamp()
-                      });
-                    } else {
-                      // For login, we use the username field as email
-                      const email = loginForm.username;
-                      await signInWithEmailAndPassword(auth, email, loginForm.password);
-                    }
-                    setIsLoginOpen(false);
-                    setIsSignup(false);
-                    setLoginForm({ username: '', email: '', password: '', confirmPassword: '', dob: '' });
-                  } catch (error: any) {
-                    console.error("Auth error", error);
-                    let message = "Authentication failed. Please try again.";
-                    if (error.code === 'auth/user-not-found') message = "User not found. Please check your email.";
-                    if (error.code === 'auth/wrong-password') message = "Incorrect password. Please try again.";
-                    if (error.code === 'auth/email-already-in-use') message = "Email already in use. Try signing in!";
-                    if (error.code === 'auth/weak-password') message = "Password is too weak.";
-                    if (error.code === 'auth/invalid-email') message = "Please enter a valid email address.";
-                    setAuthError(message);
-                  } finally {
-                    setAuthLoading(false);
-                  }
-                }}
-                disabled={authLoading}
-                className="w-full bg-cute-pink text-white py-5 rounded-2xl font-bold text-lg shadow-lg shadow-cute-pink/20 hover:scale-[1.02] transition-all mt-4 flex items-center justify-center gap-2 disabled:opacity-70"
-              >
-                {authLoading && <Loader2 className="w-5 h-5 animate-spin" />}
-                {isSignup ? "Create Account" : "Sign In"}
-              </button>
-
-              <p className="text-center text-sm text-brand-400 font-medium">
-                {isSignup ? "Already have an account?" : "Don't have an account?"} 
                 <button 
-                  onClick={() => {
-                    setIsSignup(!isSignup);
+                  onClick={async () => {
                     setAuthError(null);
-                    setLoginForm({ username: '', email: '', password: '', confirmPassword: '', dob: '' });
+                    // Security Restrictions (Applies to both Login and Signup)
+                    if (loginForm.password && loginForm.username && loginForm.password === loginForm.username) {
+                      setAuthError("Password cannot be the same as username! 🛡️");
+                      return;
+                    }
+
+                    if (isSignup) {
+                      if (!loginForm.email || !loginForm.username || !loginForm.password) {
+                        setAuthError("Please fill in all required fields! 🍳");
+                        return;
+                      }
+
+                      if (!isValidEmail(loginForm.email)) {
+                        setAuthError("Please enter a valid email address! 📧");
+                        return;
+                      }
+
+                      if (loginForm.dob && loginForm.password.includes(loginForm.dob.replace(/-/g, ''))) {
+                        setAuthError("Password should not contain your birth date! 🛡️");
+                        return;
+                      }
+                      
+                      if (loginForm.password !== loginForm.confirmPassword) {
+                        setAuthError("Passwords do not match! 🛡️");
+                        return;
+                      }
+
+                      const passwordError = validatePassword(loginForm.password);
+                      if (passwordError) {
+                        setAuthError(passwordError + " 🛡️");
+                        return;
+                      }
+                    } else {
+                      if (!loginForm.username || !loginForm.password) {
+                        setAuthError("Please enter your email and password! 🍳");
+                        return;
+                      }
+                      if (!isValidEmail(loginForm.username)) {
+                        setAuthError("Please enter a valid email address! 📧");
+                        return;
+                      }
+                    }
+
+                    setAuthLoading(true);
+                    try {
+                      if (isSignup) {
+                        const userCredential = await createUserWithEmailAndPassword(auth, loginForm.email, loginForm.password);
+                        await updateProfile(userCredential.user, { displayName: loginForm.username });
+                        
+                        // Create user document in Firestore
+                        await setDoc(doc(db, 'users', userCredential.user.uid), {
+                          username: loginForm.username,
+                          email: loginForm.email,
+                          dob: loginForm.dob,
+                          favorites: [],
+                          history: [],
+                          createdAt: serverTimestamp()
+                        });
+                      } else {
+                        // For login, we use the username field as email
+                        const email = loginForm.username;
+                        await signInWithEmailAndPassword(auth, email, loginForm.password);
+                      }
+                      setIsLoginOpen(false);
+                      setIsSignup(false);
+                      setLoginForm({ username: '', email: '', password: '', confirmPassword: '', dob: '' });
+                    } catch (error: any) {
+                      console.error("Auth error", error);
+                      let message = "Authentication failed. Please try again.";
+                      if (error.code === 'auth/user-not-found') message = "User not found. Please check your email.";
+                      if (error.code === 'auth/wrong-password') message = "Incorrect password. Please try again.";
+                      if (error.code === 'auth/email-already-in-use') message = "Email already in use. Try signing in!";
+                      if (error.code === 'auth/weak-password') message = "Password is too weak.";
+                      if (error.code === 'auth/invalid-email') message = "Please enter a valid email address.";
+                      setAuthError(message);
+                    } finally {
+                      setAuthLoading(false);
+                    }
                   }}
-                  className="text-cute-pink font-bold hover:underline ml-1"
+                  disabled={authLoading}
+                  className="w-full bg-cute-pink text-white py-5 rounded-2xl font-bold text-lg shadow-lg shadow-cute-pink/20 hover:scale-[1.02] transition-all mt-4 flex items-center justify-center gap-2 disabled:opacity-70"
                 >
-                  {isSignup ? "Sign In" : "Sign Up"}
+                  {authLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                  {isSignup ? "Create Account" : "Sign In"}
                 </button>
-              </p>
+
+                <p className="text-center text-sm text-brand-400 font-medium">
+                  {isSignup ? "Already have an account?" : "Don't have an account?"} 
+                  <button 
+                    onClick={() => {
+                      setIsSignup(!isSignup);
+                      setAuthError(null);
+                      setLoginForm({ username: '', email: '', password: '', confirmPassword: '', dob: '' });
+                    }}
+                    className="text-cute-pink font-bold hover:underline ml-1"
+                  >
+                    {isSignup ? "Sign In" : "Sign Up"}
+                  </button>
+                </p>
               </div>
             </div>
           </motion.div>
@@ -1849,8 +1849,6 @@ export default function App() {
   };
 
   const renderExplore = () => {
-
-
     return (
       <motion.div 
         initial={{ opacity: 0 }}
@@ -1863,54 +1861,54 @@ export default function App() {
           </button>
           <h2 className="text-4xl font-display text-cute-pink">Explore Trending Recipes</h2>
         </div>
+
         {exploreRecipes.length === 0 ? (
           <div className="text-center py-24">
             <Loader2 className="w-12 h-12 text-cute-pink animate-spin mx-auto mb-4" />
             <p className="text-brand-500 font-display italic text-xl text-center">Finding the most delicious recipes for you... 🍳</p>
           </div>
         ) : (
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {exploreRecipes.map((item) => (
-            <motion.div 
-              key={item.id}
-              whileHover={{ y: -10 }}
-              className="bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg flex flex-col cursor-pointer group"
-              onClick={() => {
-                setSelectedRecipe(item);
-                setStep('detail');
-              }}
-            >
-              <div className="h-56 bg-brand-100 relative overflow-hidden">
-                <img 
-                  src={item.imageUrl || `https://picsum.photos/seed/${item.id}/600/400`} 
-                  alt={item.title} 
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                />
-                <div className="absolute top-4 right-4">
-                  <div className="px-4 py-1.5 bg-white/90 backdrop-blur-sm rounded-full text-[10px] font-bold uppercase tracking-widest text-cute-pink shadow-sm">
-                    {item.cuisine}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {exploreRecipes.map((item) => (
+              <motion.div 
+                key={item.id}
+                whileHover={{ y: -10 }}
+                className="bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg flex flex-col cursor-pointer group"
+                onClick={() => {
+                  setSelectedRecipe(item);
+                  setStep('detail');
+                }}
+              >
+                <div className="h-56 bg-brand-100 relative overflow-hidden">
+                  <img 
+                    src={item.imageUrl || `https://picsum.photos/seed/${item.id}/600/400`} 
+                    alt={item.title} 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div className="absolute top-4 right-4">
+                    <div className="px-4 py-1.5 bg-white/90 backdrop-blur-sm rounded-full text-[10px] font-bold uppercase tracking-widest text-cute-pink shadow-sm">
+                      {item.cuisine}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="p-8 flex-1 flex flex-col">
-                <h3 className="text-2xl font-display mb-3 leading-tight text-brand-900">{item.title}</h3>
-                <p className="text-brand-600 text-sm mb-6 line-clamp-2 flex-1 leading-relaxed">{item.description}</p>
-                <div className="flex items-center justify-between pt-6 border-t border-brand-50">
-                  <div className="flex items-center gap-2 text-cute-pink font-bold">
-                    <Clock className="w-5 h-5" />
-                    <span className="text-sm">{item.cookingTime}m</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-cute-blue font-bold">
-                    <Utensils className="w-5 h-5" />
-                    <span className="text-sm">{item.ingredients.length} items</span>
+                <div className="p-8 flex-1 flex flex-col">
+                  <h3 className="text-2xl font-display mb-3 leading-tight text-brand-900">{item.title}</h3>
+                  <p className="text-brand-600 text-sm mb-6 line-clamp-2 flex-1 leading-relaxed">{item.description}</p>
+                  <div className="flex items-center justify-between pt-6 border-t border-brand-50">
+                    <div className="flex items-center gap-2 text-cute-pink font-bold">
+                      <Clock className="w-5 h-5" />
+                      <span className="text-sm">{item.cookingTime}m</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-cute-blue font-bold">
+                      <Utensils className="w-5 h-5" />
+                      <span className="text-sm">{item.ingredients.length} items</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-         )}
+              </motion.div>
+            ))}
+          </div>
+        )}
       </motion.div>
     );
   };
@@ -1948,7 +1946,7 @@ export default function App() {
             >
               <div className="h-48 bg-brand-100 relative overflow-hidden">
                 <img 
-                   src={recipe.imageUrl || `https://picsum.photos/seed/${recipe.id}/600/400`} 
+                  src={recipe.imageUrl || `https://picsum.photos/seed/${recipe.id}/600/400`} 
                   alt={recipe.title} 
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 />
@@ -2145,7 +2143,7 @@ export default function App() {
             <Heart className={cn("w-4 h-4", favorites.length > 0 && "fill-cute-pink text-cute-pink")} />
             Favorites ({favorites.length})
           </button>
-          { (user?.role === 'admin' || user?.email === 'pranati.parandkar@gmail.com' || user?.email === 'palaijharana98@gmail.com') && (
+          { (user?.role === 'admin' || user?.email === 'pranati.parandkar@gmail.com' || user?.email === 'abc@hotmail.com') && (
             <button 
               onClick={() => setStep('analytics')}
               className={cn(
@@ -2313,6 +2311,7 @@ export default function App() {
           </div>
         </div>
       </footer>
+      <ChatBot currentRecipe={selectedRecipe} />
     </div>
   );
 }
