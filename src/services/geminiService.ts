@@ -115,3 +115,48 @@ export async function generateRecipes(
 export async function generateSpeech(text: string): Promise<string | undefined> {
   return undefined;
 }
+export async function getChatResponse(
+  message: string,
+  chatHistory: { role: "user" | "model"; parts: { text: string }[] }[],
+  context?: { recipe?: Recipe; appInfo: string }
+): Promise<string> {
+  try {
+    const systemInstruction = `You are the Snap2Serve AI Assistant. Your goal is to help users with their cooking journey and navigating the Snap2Serve app.
+      
+      Snap2Serve Features:
+      - Snap a photo of ingredients to detect them using AI.
+      - Generate personalized recipes based on detected ingredients and dietary preferences.
+      - Save favorites and view cooking history.
+      - Interactive cooking mode with voice guidance.
+      - Explore trending recipes from different cuisines.
+      
+      Current Context:
+      ${context?.recipe ? `The user is currently viewing a recipe: "${context.recipe.title}". 
+      Description: ${context.recipe.description}
+      Ingredients: ${context.recipe.ingredients.join(", ")}
+      Instructions: ${context.recipe.instructions.join(". ")}` : "No specific recipe selected yet."}
+      
+      Guidelines:
+      - Be friendly, helpful, and encouraging.
+      - Keep responses concise but informative.
+      - If asked about a recipe, provide tips, substitutions, or clarifications.
+      - If asked about the app, explain how to use its features.
+      - Use emojis to keep the tone light and fun! ✨`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        ...chatHistory,
+        { role: "user", parts: [{ text: message }] }
+      ],
+      config: {
+        systemInstruction: systemInstruction
+      }
+    });
+
+    return response.text || "I'm sorry, I couldn't generate a response. 🍳";
+  } catch (error) {
+    console.error("Chat Error:", error);
+    return "Oops! I'm having a little trouble thinking right now. Could you try asking again? 🍳";
+  }
+}
