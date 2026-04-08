@@ -14,6 +14,7 @@ export interface Recipe {
   cuisine: string;
   dietaryInfo: string[];
   calories?: number;
+  imageUrl?: string;
 }
 
 export interface UserPreferences {

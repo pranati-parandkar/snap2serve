@@ -77,6 +77,7 @@ import {
 } from 'lucide-react';
 import { Recipe, Ingredient, UserPreferences, Session, AnalyticsData } from './types';
 import { detectIngredients, generateRecipes, generateSpeech } from './services/geminiService';
+import { fetchRecipeImage } from './services/pixabayService';
 import { cn } from './lib/utils';
 import { auth, db } from './firebase';
 import { 
@@ -211,6 +212,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
+  const [exploreRecipes, setExploreRecipes] = useState<Recipe[]>([]);
   const sessionRef = useRef<string | null>(null);
 
   const getPasswordStrength = (password: string) => {
@@ -512,6 +514,112 @@ export default function App() {
       NON_VEGAN_KEYWORDS.some(keyword => ing.name.toLowerCase().includes(keyword))
     );
   };
+  useEffect(() => {
+    const initializeExplore = async () => {
+      const cuisines = ['Mexican', 'Indian', 'Italian', 'Chinese', 'Japanese'];
+      const recipeTemplates = [
+        { 
+          title: "Spicy {cuisine} Bowl", 
+          time: 20, 
+          cal: 350,
+          desc: "A vibrant and spicy bowl packed with authentic {cuisine} flavors and fresh vegetables.",
+          ingredients: ["Rice", "Spices", "Fresh Herbs", "Vegetables", "Secret Sauce"],
+          instructions: ["Prepare the base ingredients", "Sauté with aromatic spices", "Garnish with fresh herbs", "Serve hot and enjoy!"]
+        },
+        { 
+          title: "Creamy {cuisine} Delight", 
+          time: 40, 
+          cal: 520,
+          desc: "Rich, creamy, and absolutely comforting. This {cuisine} classic is a crowd favorite.",
+          ingredients: ["Cream", "Primary Protein", "Aromatic Base", "Butter", "Special Seasoning"],
+          instructions: ["Slow cook the base", "Incorporate the creamy elements", "Simmer until perfect consistency", "Pair with your favorite side"]
+        },
+        { 
+          title: "Classic {cuisine} Mix", 
+          time: 30, 
+          cal: 400,
+          desc: "The perfect balance of traditional {cuisine} ingredients in one satisfying dish.",
+          ingredients: ["Traditional Grains", "Seasonal Veggies", "House Blend Spices", "Olive Oil"],
+          instructions: ["Prep all ingredients", "Combine in a large pan", "Cook over medium heat", "Season to taste"]
+        },
+        { 
+          title: "Healthy {cuisine} Salad", 
+          time: 15, 
+          cal: 280,
+          desc: "Light, refreshing, and full of nutrients. A modern take on {cuisine} healthy eating.",
+          ingredients: ["Leafy Greens", "Crunchy Toppings", "Light Dressing", "Nuts", "Seeds"],
+          instructions: ["Wash and dry the greens", "Whisk the dressing", "Toss everything together", "Serve immediately"]
+        },
+        { 
+          title: "Grandma's {cuisine} Secret", 
+          time: 50, 
+          cal: 600,
+          desc: "A time-honored recipe passed down through generations. Pure {cuisine} soul food.",
+          ingredients: ["Heritage Ingredients", "Slow-cooked Broth", "Love", "Hand-picked Herbs"],
+          instructions: ["Start the long simmer", "Add ingredients at precise intervals", "Let the flavors meld", "Serve with tradition"]
+        },
+        { 
+          title: "Quick {cuisine} Stir-fry", 
+          time: 25, 
+          cal: 380,
+          desc: "Fast, fresh, and flavorful. Perfect for a busy weeknight {cuisine} dinner.",
+          ingredients: ["Wok-ready Veggies", "Soy Sauce", "Ginger", "Garlic", "Sesame Oil"],
+          instructions: ["Heat the wok to high", "Flash fry the aromatics", "Add veggies and sauce", "Serve over rice"]
+        },
+        { 
+          title: "Authentic {cuisine} Feast", 
+          time: 45, 
+          cal: 550,
+          desc: "An elaborate spread of {cuisine} delicacies that will transport your taste buds.",
+          ingredients: ["Premium Spices", "Fresh Produce", "Traditional Grains", "Artisanal Oils"],
+          instructions: ["Prepare multiple components", "Layer the flavors carefully", "Cook to perfection", "Present beautifully"]
+        },
+        { 
+          title: "Modern {cuisine} Fusion", 
+          time: 35, 
+          cal: 420,
+          desc: "A creative blend of traditional {cuisine} techniques and contemporary ingredients.",
+          ingredients: ["Fusion Elements", "Classic Base", "Exotic Spices", "Fresh Garnish"],
+          instructions: ["Experiment with textures", "Balance the bold flavors", "Cook with precision", "Garnish creatively"]
+        },
+        { 
+          title: "Midnight {cuisine} Snack", 
+          time: 10, 
+          cal: 250,
+          desc: "The ultimate quick fix for your {cuisine} cravings. Simple yet delicious.",
+          ingredients: ["Pantry Staples", "Quick Spices", "Leftover Magic", "Crispy Toppings"],
+          instructions: ["Quick prep", "Heat and mix", "Add a crunch", "Enjoy your snack"]
+        },
+      ];
+
+      const baseRecipes = cuisines.flatMap(cuisine => 
+        recipeTemplates.map((t, i) => ({
+          id: `explore-${cuisine}-${i}`,
+          title: t.title.replace(/{cuisine}/g, cuisine),
+          cuisine,
+          cookingTime: t.time + Math.floor(Math.random() * 10),
+          calories: t.cal + Math.floor(Math.random() * 50),
+          difficulty: ['Easy', 'Medium', 'Hard'][Math.floor(Math.random() * 3)] as any,
+          description: t.desc.replace(/{cuisine}/g, cuisine),
+          ingredients: t.ingredients,
+          instructions: t.instructions,
+          dietaryInfo: ['Healthy', cuisine],
+          imageUrl: undefined as string | undefined
+        }))
+      );
+
+      // Fetch images for explore recipes
+      const withImages = await Promise.all(baseRecipes.map(async (r) => {
+        const imageUrl = await fetchRecipeImage(r.title);
+        return { ...r, imageUrl };
+      }));
+
+      setExploreRecipes(withImages.sort(() => Math.random() - 0.5));
+    };
+
+    initializeExplore();
+  }, []);
+
 
   useEffect(() => {
     if (!isVeganPossible() && preferences.dietaryRestrictions.includes('Vegan')) {
@@ -634,14 +742,18 @@ export default function App() {
     try {
       const ingredientNames = detectedIngredients.map(i => i.name);
       const generated = await generateRecipes(ingredientNames, preferences);
-      // Ensure unique IDs for each recipe to avoid favorites/history bugs
-      const recipesWithUniqueIds = generated.map((recipe, index) => ({
-        ...recipe,
-        id: recipe.id === 'a-truly-unique-string-id' || !recipe.id 
-          ? `recipe_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
-          : recipe.id
+      const recipesWithImages = await Promise.all(generated.map(async (recipe, index) => {
+        const imageUrl = await fetchRecipeImage(recipe.title);
+        return {
+          ...recipe,
+          id: recipe.id === 'a-truly-unique-string-id' || !recipe.id 
+            ? `recipe_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
+            : recipe.id,
+          imageUrl: imageUrl || `https://picsum.photos/seed/${recipe.id || index}/600/400` // Fallback to picsum if pixabay fails
+        };
       }));
-      setRecipes(recipesWithUniqueIds);
+
+      setRecipes(recipesWithImages);
       setStep('recipes');
     } catch (error) {
       console.error(error);
@@ -1008,7 +1120,7 @@ export default function App() {
           >
             <div className="h-56 bg-brand-100 relative overflow-hidden">
               <img 
-                src={`https://picsum.photos/seed/${recipe.id}/600/400`} 
+                src={recipe.imageUrl || `https://picsum.photos/seed/${recipe.id}/600/400`} 
                 alt={recipe.title} 
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
@@ -1088,7 +1200,7 @@ export default function App() {
           <div className="lg:col-span-2">
             <div className="relative h-[450px] rounded-[3.5rem] overflow-hidden mb-10 shadow-2xl border-8 border-white">
               <img 
-                src={`https://picsum.photos/seed/${selectedRecipe.id}/1200/800`} 
+                src={selectedRecipe.imageUrl || `https://picsum.photos/seed/${selectedRecipe.id}/1200/800`}
                 alt={selectedRecipe.title} 
                 className="w-full h-full object-cover"
               />
@@ -1705,7 +1817,7 @@ export default function App() {
               >
                 <div className="h-48 bg-brand-100 relative overflow-hidden">
                   <img 
-                    src={`https://picsum.photos/seed/${recipe.id}/600/400`} 
+                    src={recipe.imageUrl || `https://picsum.photos/seed/${recipe.id}/600/400`} 
                     alt={recipe.title} 
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
@@ -1737,96 +1849,7 @@ export default function App() {
   };
 
   const renderExplore = () => {
-    const cuisines = ['Mexican', 'Indian', 'Italian', 'Japanese'];
-    const recipeTemplates = [
-      { 
-        title: "Spicy {cuisine} Bowl", 
-        time: 20, 
-        cal: 350,
-        desc: "A vibrant and spicy bowl packed with authentic {cuisine} flavors and fresh vegetables.",
-        ingredients: ["Rice", "Spices", "Fresh Herbs", "Vegetables", "Secret Sauce"],
-        instructions: ["Prepare the base ingredients", "Sauté with aromatic spices", "Garnish with fresh herbs", "Serve hot and enjoy!"]
-      },
-      { 
-        title: "Creamy {cuisine} Delight", 
-        time: 40, 
-        cal: 520,
-        desc: "Rich, creamy, and absolutely comforting. This {cuisine} classic is a crowd favorite.",
-        ingredients: ["Cream", "Primary Protein", "Aromatic Base", "Butter", "Special Seasoning"],
-        instructions: ["Slow cook the base", "Incorporate the creamy elements", "Simmer until perfect consistency", "Pair with your favorite side"]
-      },
-      { 
-        title: "Classic {cuisine} Mix", 
-        time: 30, 
-        cal: 400,
-        desc: "The perfect balance of traditional {cuisine} ingredients in one satisfying dish.",
-        ingredients: ["Traditional Grains", "Seasonal Veggies", "House Blend Spices", "Olive Oil"],
-        instructions: ["Prep all ingredients", "Combine in a large pan", "Cook over medium heat", "Season to taste"]
-      },
-      { 
-        title: "Healthy {cuisine} Salad", 
-        time: 15, 
-        cal: 280,
-        desc: "Light, refreshing, and full of nutrients. A modern take on {cuisine} healthy eating.",
-        ingredients: ["Leafy Greens", "Crunchy Toppings", "Light Dressing", "Nuts", "Seeds"],
-        instructions: ["Wash and dry the greens", "Whisk the dressing", "Toss everything together", "Serve immediately"]
-      },
-      { 
-        title: "Grandma's {cuisine} Secret", 
-        time: 50, 
-        cal: 600,
-        desc: "A time-honored recipe passed down through generations. Pure {cuisine} soul food.",
-        ingredients: ["Heritage Ingredients", "Slow-cooked Broth", "Love", "Hand-picked Herbs"],
-        instructions: ["Start the long simmer", "Add ingredients at precise intervals", "Let the flavors meld", "Serve with tradition"]
-      },
-      { 
-        title: "Quick {cuisine} Stir-fry", 
-        time: 25, 
-        cal: 380,
-        desc: "Fast, fresh, and flavorful. Perfect for a busy weeknight {cuisine} dinner.",
-        ingredients: ["Wok-ready Veggies", "Soy Sauce", "Ginger", "Garlic", "Sesame Oil"],
-        instructions: ["Heat the wok to high", "Flash fry the aromatics", "Add veggies and sauce", "Serve over rice"]
-      },
-      { 
-        title: "Authentic {cuisine} Feast", 
-        time: 45, 
-        cal: 550,
-        desc: "An elaborate spread of {cuisine} delicacies that will transport your taste buds.",
-        ingredients: ["Premium Spices", "Fresh Produce", "Traditional Grains", "Artisanal Oils"],
-        instructions: ["Prepare multiple components", "Layer the flavors carefully", "Cook to perfection", "Present beautifully"]
-      },
-      { 
-        title: "Modern {cuisine} Fusion", 
-        time: 35, 
-        cal: 420,
-        desc: "A creative blend of traditional {cuisine} techniques and contemporary ingredients.",
-        ingredients: ["Fusion Elements", "Classic Base", "Exotic Spices", "Fresh Garnish"],
-        instructions: ["Experiment with textures", "Balance the bold flavors", "Cook with precision", "Garnish creatively"]
-      },
-      { 
-        title: "Midnight {cuisine} Snack", 
-        time: 10, 
-        cal: 250,
-        desc: "The ultimate quick fix for your {cuisine} cravings. Simple yet delicious.",
-        ingredients: ["Pantry Staples", "Quick Spices", "Leftover Magic", "Crispy Toppings"],
-        instructions: ["Quick prep", "Heat and mix", "Add a crunch", "Enjoy your snack"]
-      },
-    ];
 
-    const exploreRecipes = cuisines.flatMap(cuisine => 
-      recipeTemplates.map((t, i) => ({
-        id: `explore-${cuisine}-${i}`,
-        title: t.title.replace(/{cuisine}/g, cuisine),
-        cuisine,
-        cookingTime: t.time + Math.floor(Math.random() * 10),
-        calories: t.cal + Math.floor(Math.random() * 50),
-        difficulty: ['Easy', 'Medium', 'Hard'][Math.floor(Math.random() * 3)] as any,
-        description: t.desc.replace(/{cuisine}/g, cuisine),
-        ingredients: t.ingredients,
-        instructions: t.instructions,
-        dietaryInfo: ['Healthy', cuisine]
-      }))
-    ).sort(() => Math.random() - 0.5);
 
     return (
       <motion.div 
@@ -1840,6 +1863,12 @@ export default function App() {
           </button>
           <h2 className="text-4xl font-display text-cute-pink">Explore Trending Recipes</h2>
         </div>
+        {exploreRecipes.length === 0 ? (
+          <div className="text-center py-24">
+            <Loader2 className="w-12 h-12 text-cute-pink animate-spin mx-auto mb-4" />
+            <p className="text-brand-500 font-display italic text-xl text-center">Finding the most delicious recipes for you... 🍳</p>
+          </div>
+        ) : (
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {exploreRecipes.map((item) => (
@@ -1848,13 +1877,13 @@ export default function App() {
               whileHover={{ y: -10 }}
               className="bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg flex flex-col cursor-pointer group"
               onClick={() => {
-                setSelectedRecipe(item as any);
+                setSelectedRecipe(item);
                 setStep('detail');
               }}
             >
               <div className="h-56 bg-brand-100 relative overflow-hidden">
                 <img 
-                  src={`https://picsum.photos/seed/${item.id}/600/400`} 
+                  src={item.imageUrl || `https://picsum.photos/seed/${item.id}/600/400`} 
                   alt={item.title} 
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 />
@@ -1881,6 +1910,7 @@ export default function App() {
             </motion.div>
           ))}
         </div>
+         )}
       </motion.div>
     );
   };
@@ -1918,7 +1948,7 @@ export default function App() {
             >
               <div className="h-48 bg-brand-100 relative overflow-hidden">
                 <img 
-                  src={`https://picsum.photos/seed/${recipe.id}/600/400`} 
+                   src={recipe.imageUrl || `https://picsum.photos/seed/${recipe.id}/600/400`} 
                   alt={recipe.title} 
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 />
