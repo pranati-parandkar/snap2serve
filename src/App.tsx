@@ -1285,10 +1285,10 @@ export default function App() {
                   const event = new CustomEvent('open-chatbot', { detail: `I have a question about the ${selectedRecipe.title} recipe.` });
                   window.dispatchEvent(event);
                 }}
-                className="w-full mt-4 bg-cute-blue text-white py-5 rounded-full font-bold text-lg flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-lg"
+className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex items-end justify-center hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
               >
-                <Bot className="w-5 h-5" />
-                Ask AI about this recipe
+                <Bot className="absolute left-[20%] w-7 h-7" />
+                <span>Ask AI about this recipe</span>
               </button>
             </div>
           </div>
