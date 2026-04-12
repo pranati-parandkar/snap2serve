@@ -619,13 +619,13 @@ export default function App() {
 
   useEffect(() => {
     if (step === 'cooking' && selectedRecipe && currentStepIndex < selectedRecipe.instructions.length - 1) {
-      setAutoNextTimer(5);
+      setAutoNextTimer(10);
       const interval = setInterval(() => {
         setAutoNextTimer(prev => {
           if (prev === null) return null;
           if (prev <= 1) {
             setCurrentStepIndex(curr => curr + 1);
-            return 5;
+            return 10;
           }
           return prev - 1;
         });
