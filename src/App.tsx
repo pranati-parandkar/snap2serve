@@ -1098,8 +1098,7 @@ export default function App() {
         {recipes.map((recipe) => (
           <motion.div 
             key={recipe.id}
-            whileHover={{ y: -12, scale: 1.02 }}
-            className="bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg hover:shadow-2xl transition-all cursor-pointer flex flex-col group"
+            className="recipe-card bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg transition-all cursor-pointer flex flex-col group"
             onClick={() => {
               setSelectedRecipe(recipe);
               addToHistory(recipe);
@@ -1807,8 +1806,7 @@ export default function App() {
             {favorites.map((recipe) => (
               <motion.div 
                 key={recipe.id}
-                whileHover={{ y: -12, scale: 1.02 }}
-                className="bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg hover:shadow-2xl transition-all cursor-pointer flex flex-col group"
+                className="recipe-card bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg transition-all cursor-pointer flex flex-col group"
                 onClick={() => {
                   setSelectedRecipe(recipe);
                   addToHistory(recipe);
@@ -1872,8 +1870,7 @@ export default function App() {
             {exploreRecipes.map((item) => (
               <motion.div 
                 key={item.id}
-                whileHover={{ y: -10 }}
-                className="bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg flex flex-col cursor-pointer group"
+                className="recipe-card bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg flex flex-col cursor-pointer group"
                 onClick={() => {
                   setSelectedRecipe(item);
                   setStep('detail');
@@ -1936,8 +1933,7 @@ export default function App() {
           {history.map((recipe) => (
             <motion.div 
               key={recipe.id}
-              whileHover={{ y: -12, scale: 1.02 }}
-              className="bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg hover:shadow-2xl transition-all cursor-pointer flex flex-col group"
+              className="recipe-card bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg transition-all cursor-pointer flex flex-col group"
               onClick={() => {
                 setSelectedRecipe(recipe);
                 addToHistory(recipe);

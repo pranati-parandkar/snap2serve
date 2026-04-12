@@ -45,6 +45,7 @@
 .markdown-body ol { @apply list-decimal pl-6 mb-4; }
 .markdown-body li { @apply mb-1; }
 
+/* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
 }
@@ -69,4 +70,15 @@
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #ffc985 transparent;
+}
+
+/* Recipe Card Hover Effect */
+.recipe-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.recipe-card:hover {
+  transform: translateY(-12px) scale(1.02);
+  box-shadow: 0 25px 50px -12px rgba(255, 138, 138, 0.25);
+  background-color: #fff1db; /* soft light orange/cream */
 }
