@@ -215,6 +215,7 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
   const [exploreRecipes, setExploreRecipes] = useState<Recipe[]>([]);
+  const [autoNextTimer, setAutoNextTimer] = useState<number | null>(null);
   const sessionRef = useRef<string | null>(null);
 
   const getPasswordStrength = (password: string) => {
@@ -615,6 +616,25 @@ export default function App() {
       }));
     }
   }, [detectedIngredients]);
+
+  useEffect(() => {
+    if (step === 'cooking' && selectedRecipe && currentStepIndex < selectedRecipe.instructions.length - 1) {
+      setAutoNextTimer(5);
+      const interval = setInterval(() => {
+        setAutoNextTimer(prev => {
+          if (prev === null) return null;
+          if (prev <= 1) {
+            setCurrentStepIndex(curr => curr + 1);
+            return 5;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setAutoNextTimer(null);
+    }
+  }, [step, currentStepIndex, selectedRecipe]);
 
   useEffect(() => {
     if (!isAuthReady) return;
@@ -1344,6 +1364,11 @@ export default function App() {
                 <h3 className="text-3xl md:text-5xl font-display text-brand-950 leading-tight">
                   {currentStep}
                 </h3>
+                {autoNextTimer !== null && (
+                  <p className="mt-6 text-cute-pink font-bold animate-pulse">
+                    Next step in {autoNextTimer}s...
+                  </p>
+                )}
               </div>
 
               <button 
@@ -1370,7 +1395,10 @@ export default function App() {
             
             {currentStepIndex === selectedRecipe.instructions.length - 1 ? (
               <button
-                onClick={() => setShowRating(true)}
+                onClick={() => {
+                  setAutoNextTimer(null);
+                  setShowRating(true);
+                }}
                 className="flex-1 bg-cute-mint text-white py-6 rounded-[2rem] font-bold text-xl flex items-center justify-center gap-3 hover:scale-[1.02] transition-all shadow-lg shadow-cute-mint/20"
               >
                 <CheckCircle2 className="w-6 h-6" />
@@ -1378,7 +1406,10 @@ export default function App() {
               </button>
             ) : (
               <button
-                onClick={() => setCurrentStepIndex(prev => prev + 1)}
+                onClick={() => {
+                  setAutoNextTimer(5);
+                  setCurrentStepIndex(prev => prev + 1);
+                }}
                 className="flex-1 bg-cute-pink text-white py-6 rounded-[2rem] font-bold text-xl flex items-center justify-center gap-3 hover:scale-[1.02] transition-all shadow-lg shadow-cute-pink/20"
               >
                 Next Step
