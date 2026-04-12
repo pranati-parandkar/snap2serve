@@ -503,7 +503,7 @@ export default function App() {
 
   useEffect(() => {
     const initializeExplore = async () => {
-      const cuisines = ['Mexican', 'Indian', 'Italian', 'Japanese'];
+      const cuisines = ['Mexican', 'Indian', 'Italian', 'Chinese', 'Japanese'];
       const recipeTemplates = [
         { 
           title: "Spicy {cuisine} Bowl", 
@@ -942,11 +942,11 @@ export default function App() {
           <div className="bg-white p-8 rounded-[2.5rem] border-4 border-cute-mint/20 shadow-sm">
             <h3 className="text-2xl font-display mb-4 flex items-center gap-2 text-cute-mint">
               <Utensils className="w-6 h-6" />
-              Your Ingredients
+              Your Ingredients (<span id="count">{detectedIngredients.length}</span>)
             </h3>
             <div className="flex flex-wrap gap-2">
               {detectedIngredients.map((ing, i) => (
-                <span key={i} className="px-5 py-2 bg-cute-mint/10 text-brand-800 rounded-full text-sm font-bold flex items-center gap-2 border border-cute-mint/30">
+                <span key={i} className="ingredient px-5 py-2 bg-cute-mint/10 text-brand-800 rounded-full text-sm font-bold flex items-center gap-2 border border-cute-mint/30">
                   {ing.name}
                   <button 
                     onClick={() => setDetectedIngredients(detectedIngredients.filter((_, idx) => idx !== i))}
@@ -1044,7 +1044,7 @@ export default function App() {
               <div>
                 <label className="text-sm font-bold text-brand-500 mb-2 block">Cuisine Style? 🌎</label>
                 <div className="flex flex-wrap gap-2">
-                  {['Any', 'Mexican', 'Indian', 'Italian', 'Japanese'].map(cuisine => (
+                  {['Any', 'Mexican', 'Indian', 'Italian', 'Chinese', 'Japanese'].map(cuisine => (
                     <button
                       key={cuisine}
                       onClick={() => setPreferences({ ...preferences, cuisine: cuisine === 'Any' ? undefined : cuisine })}
@@ -1285,9 +1285,9 @@ export default function App() {
                   const event = new CustomEvent('open-chatbot', { detail: `I have a question about the ${selectedRecipe.title} recipe.` });
                   window.dispatchEvent(event);
                 }}
-className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex items-end justify-center hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
+                className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex items-center justify-center hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
               >
-                <Bot className="absolute left-[20%] w-7 h-7" />
+                <Bot className="absolute left-[15%] w-7 h-7" />
                 <span>Ask AI about this recipe</span>
               </button>
             </div>
