@@ -81,83 +81,7 @@ import { detectIngredients, generateRecipes, generateSpeech } from './services/g
 import { fetchRecipeImage } from './services/pixabayService';
 import { ChatBot } from './components/ChatBot';
 import { cn } from './lib/utils';
-import { auth, db } from './firebase';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  onAuthStateChanged, 
-  signOut,
-  updateProfile,
-  sendPasswordResetEmail
-} from 'firebase/auth';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  arrayUnion, 
-  arrayRemove, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  limit, 
-  getDocs, 
-  addDoc, 
-  serverTimestamp,
-  getDocFromServer
-} from 'firebase/firestore';
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
+import { apiService } from './services/apiservice';
 
 function pcmToWav(pcmBase64: string, sampleRate: number = 24000): string {
   const pcmData = Uint8Array.from(atob(pcmBase64), c => c.charCodeAt(0));
@@ -213,8 +137,8 @@ export default function App() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [resetSent, setResetSent] = useState(false);
   const [exploreRecipes, setExploreRecipes] = useState<Recipe[]>([]);
+  const [autoNextTimer, setAutoNextTimer] = useState<number | null>(null);
   const sessionRef = useRef<string | null>(null);
 
   const getPasswordStrength = (password: string) => {
@@ -276,88 +200,47 @@ export default function App() {
     return () => clearInterval(interval);
   }, [step, loading]);
 
-  // Firebase Auth Listener
+  // Auth Listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        const userData = userDoc.exists() ? userDoc.data() : null;
-        
-        // Check if document needs repair (missing required fields for security rules)
-        const needsRepair = userData && (
-          !userData.username || 
-          !userData.email || 
-          !userData.favorites || 
-          !userData.history || 
-          !userData.createdAt
-        );
-
-        const isAdminEmail = (email: string | null) => {
-          return email === 'pranati.parandkar@gmail.com' || email === 'abc@hotmail.com';
-        };
-
-        if (!userDoc.exists() || needsRepair || (isAdminEmail(firebaseUser.email) && (userData?.role !== 'admin'))) {
-          const updatedUser = {
-            username: firebaseUser.email === 'pranati.parandkar@gmail.com' ? 'Pranati' : 
-                      (firebaseUser.email === 'abc@hotmail.com' ? 'Admin ABC' : 
-                      (userData?.username || firebaseUser.displayName || 'Chef')),
-            email: userData?.email || firebaseUser.email || '',
-            role: isAdminEmail(firebaseUser.email) ? 'admin' : (userData?.role || 'client'),
-            favorites: userData?.favorites || [],
-            history: userData?.history || [],
-            createdAt: userData?.createdAt || serverTimestamp()
-          };
-          try {
-            // Use setDoc with merge to preserve other fields like 'role' or 'dob'
-            await setDoc(userDocRef, updatedUser, { merge: true });
-            setUser({
-              username: updatedUser.username,
-              email: updatedUser.email,
-              role: updatedUser.role,
-              dob: userData?.dob
-            });
-          } catch (error) {
-            console.error("Failed to initialize/repair user document", error);
-          }
-        } else if (userData) {
+    const checkAuth = async () => {
+      try {
+        const userData = await apiService.getMe();
+        if (userData) {
           setUser({
             username: userData.username,
             email: userData.email,
             role: userData.role || 'client',
             dob: userData.dob
           });
-        }
-
-        // Update current session with UID if it exists
-        if (sessionRef.current) {
-          try {
-            await updateDoc(doc(db, 'sessions', sessionRef.current), {
-              uid: firebaseUser.uid
-            });
-          } catch (error) {
-            // Silently fail as this is just tracking
+          setFavorites(userData.favorites || []);
+          setHistory(userData.history || []);
+          if (userData.preferences) {
+            setPreferences(userData.preferences);
+          }
+        } else {
+          setUser(null);
+          // Load guest history from localStorage
+          const guestHistory = localStorage.getItem('snap2serve_guest_history');
+          if (guestHistory) {
+            try {
+              setHistory(JSON.parse(guestHistory));
+            } catch (e) {
+              setHistory([]);
+            }
+          } else {
+            setHistory([]);
           }
         }
-      } else {
-        setUser(null);
-        // Clear UID from current session if it exists
-        if (sessionRef.current) {
-          try {
-            await updateDoc(doc(db, 'sessions', sessionRef.current), {
-              uid: null
-            });
-          } catch (error) {
-            // Silently fail
-          }
-        }
+      } catch (error) {
+        console.error("Auth check failed", error);
+      } finally {
+        setIsAuthReady(true);
       }
-      setIsAuthReady(true);
-    });
-    return () => unsubscribe();
+    };
+    checkAuth();
   }, []);
 
-  // Visitor Tracking
+  // Visitor Tracking & Analytics
   useEffect(() => {
     let visitorId = localStorage.getItem('snap2serve_visitor_id');
     if (!visitorId) {
@@ -367,13 +250,10 @@ export default function App() {
 
     const startSession = async () => {
       try {
-        const sessionDoc = await addDoc(collection(db, 'sessions'), {
-          visitorId,
-          uid: auth.currentUser?.uid || null,
-          startTime: new Date().toISOString(),
-          createdAt: serverTimestamp()
-        });
-        sessionRef.current = sessionDoc.id;
+        const data = await apiService.startSession(visitorId!, user?.email);
+        if (data.sessionId) {
+          sessionRef.current = data.sessionId;
+        }
       } catch (error) {
         console.error("Failed to start session", error);
       }
@@ -383,18 +263,9 @@ export default function App() {
 
     const endSession = async () => {
       if (sessionRef.current) {
-        const endTime = new Date();
-        const sessionDocRef = doc(db, 'sessions', sessionRef.current);
         try {
-          const sessionSnap = await getDoc(sessionDocRef);
-          if (sessionSnap.exists()) {
-            const startTime = new Date(sessionSnap.data().startTime);
-            const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
-            await updateDoc(sessionDocRef, {
-              endTime: endTime.toISOString(),
-              duration: duration
-            });
-          }
+          await apiService.endSession(sessionRef.current);
+          sessionRef.current = null;
         } catch (error) {
           console.error("Failed to end session", error);
         }
@@ -404,6 +275,8 @@ export default function App() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         endSession();
+      } else if (document.visibilityState === 'visible' && !sessionRef.current) {
+        startSession();
       }
     };
 
@@ -415,13 +288,12 @@ export default function App() {
       window.removeEventListener('beforeunload', endSession);
       endSession();
     };
-  }, []);
+  }, [user]);
 
   // Fetch Analytics
   useEffect(() => {
     if (step === 'analytics') {
       const fetchAnalytics = async () => {
-        // Only admins should be able to fetch analytics
         const isAdmin = user?.role === 'admin' || user?.email === 'pranati.parandkar@gmail.com' || user?.email === 'abc@hotmail.com';
         if (!isAdmin) {
           setStep('home');
@@ -429,57 +301,38 @@ export default function App() {
         }
         
         try {
-          const querySnapshot = await getDocs(collection(db, 'sessions'));
-          const sessions = querySnapshot.docs.map(doc => doc.data() as Session);
-          
-          const totalVisits = sessions.length;
-          const uniqueVisitors = new Set(sessions.map(s => s.visitorId)).size;
-          const sessionsWithDuration = sessions.filter(s => s.duration !== undefined);
-          const totalDuration = sessionsWithDuration.reduce((acc, s) => acc + (s.duration || 0), 0);
-          const avgDuration = sessionsWithDuration.length > 0 ? totalDuration / sessionsWithDuration.length : 0;
-
-          const visitsByDay: Record<string, number> = {};
-          sessions.forEach(s => {
-            const date = new Date(s.startTime).toLocaleDateString();
-            visitsByDay[date] = (visitsByDay[date] || 0) + 1;
-          });
-          const visitsPerDay = Object.entries(visitsByDay)
-            .map(([date, count]) => ({ date, count }))
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-          setAnalyticsData({
-            totalVisitors: uniqueVisitors,
-            totalVisits: totalVisits,
-            avgTimeSpent: avgDuration,
-            visitsPerDay
-          });
+          const data = await apiService.getAnalytics();
+          setAnalyticsData(data);
         } catch (error) {
-          handleFirestoreError(error, OperationType.LIST, 'sessions');
+          console.error("Failed to fetch analytics", error);
         }
       };
       fetchAnalytics();
     }
-  }, [step]);
-
-  // Test Connection
-  useEffect(() => {
-    const testConnection = async () => {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if(error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration. ");
-        }
-      }
-    };
-    testConnection();
-  }, []);
+  }, [step, user]);
 
   const [preferences, setPreferences] = useState<UserPreferences>({
     dietaryRestrictions: [],
     allergies: [],
     maxTime: 45,
   });
+
+  // Sync Preferences to Backend
+  useEffect(() => {
+    if (user && isAuthReady) {
+      const syncPrefs = async () => {
+        try {
+          await apiService.updateUserData({ preferences });
+        } catch (error) {
+          console.error("Failed to sync preferences", error);
+        }
+      };
+      // Debounce sync to avoid too many requests
+      const timer = setTimeout(syncPrefs, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [preferences, user, isAuthReady]);
+
   const [favorites, setFavorites] = useState<Recipe[]>([]);
   const [history, setHistory] = useState<Recipe[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -616,80 +469,59 @@ export default function App() {
     }
   }, [detectedIngredients]);
 
-
   useEffect(() => {
-    if (!isAuthReady) return;
-
-    if (!auth.currentUser) {
-      setFavorites([]);
-      // Load guest history from localStorage
-      const guestHistory = localStorage.getItem('snap2serve_guest_history');
-      if (guestHistory) {
-        try {
-          setHistory(JSON.parse(guestHistory));
-        } catch (e) {
-          setHistory([]);
-        }
-      } else {
-        setHistory([]);
-      }
-      return;
+    if (step === 'cooking' && selectedRecipe && currentStepIndex < selectedRecipe.instructions.length - 1) {
+      setAutoNextTimer(5);
+      const interval = setInterval(() => {
+        setAutoNextTimer(prev => {
+          if (prev === null) return null;
+          if (prev <= 1) {
+            setCurrentStepIndex(curr => curr + 1);
+            return 5;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setAutoNextTimer(null);
     }
-
-    const userDocRef = doc(db, 'users', auth.currentUser.uid);
-    const unsubscribe = onSnapshot(userDocRef, (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
-        setFavorites(data.favorites || []);
-        setHistory(data.history || []);
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${auth.currentUser?.uid}`);
-    });
-
-    return () => unsubscribe();
-  }, [isAuthReady, auth.currentUser]);
+  }, [step, currentStepIndex, selectedRecipe]);
 
   const toggleFavorite = async (recipe: Recipe) => {
     if (!recipe || !recipe.id) return;
-    if (!auth.currentUser) {
+    if (!user) {
       alert("Please login to save favorites! 💖");
       setIsLoginOpen(true);
       return;
     }
 
-    const userDocRef = doc(db, 'users', auth.currentUser.uid);
     try {
       const isFavorite = favorites.some(f => f.id === recipe.id);
-      // Use setDoc with merge: true to ensure the document exists
-      await setDoc(userDocRef, {
-        favorites: isFavorite ? arrayRemove(recipe) : arrayUnion(recipe)
-      }, { merge: true });
+      const updatedFavorites = isFavorite 
+        ? favorites.filter(f => f.id !== recipe.id)
+        : [...favorites, recipe];
+      
+      setFavorites(updatedFavorites);
+      await apiService.updateUserData({ favorites: updatedFavorites });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${auth.currentUser.uid}`);
+      console.error("Failed to update favorites", error);
     }
   };
 
   const addToHistory = async (recipe: Recipe) => {
-    // 1. Update local state immediately for both guests and logged-in users
     const updatedHistory = [recipe, ...history.filter(r => r.id !== recipe.id)].slice(0, 50);
     setHistory(updatedHistory);
 
-    // 2. If guest, save to localStorage
-    if (!auth.currentUser) {
+    if (!user) {
       localStorage.setItem('snap2serve_guest_history', JSON.stringify(updatedHistory));
       return;
     }
 
-    // 3. If logged in, save to Firestore
-    const userDocRef = doc(db, 'users', auth.currentUser.uid);
     try {
-      // We save the whole array to maintain order and uniqueness (moving to front)
-      await setDoc(userDocRef, {
-        history: updatedHistory
-      }, { merge: true });
+      await apiService.updateUserData({ history: updatedHistory });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${auth.currentUser.uid}`);
+      console.error("Failed to update history", error);
     }
   };
 
@@ -1345,6 +1177,11 @@ export default function App() {
                 <h3 className="text-3xl md:text-5xl font-display text-brand-950 leading-tight">
                   {currentStep}
                 </h3>
+                {autoNextTimer !== null && (
+                  <p className="mt-6 text-cute-pink font-bold animate-pulse">
+                    Next step in {autoNextTimer}s...
+                  </p>
+                )}
               </div>
 
               <button 
@@ -1371,7 +1208,10 @@ export default function App() {
             
             {currentStepIndex === selectedRecipe.instructions.length - 1 ? (
               <button
-              onClick={() => setShowRating(true)}
+                onClick={() => {
+                  setAutoNextTimer(null);
+                  setShowRating(true);
+                }}
                 className="flex-1 bg-cute-mint text-white py-6 rounded-[2rem] font-bold text-xl flex items-center justify-center gap-3 hover:scale-[1.02] transition-all shadow-lg shadow-cute-mint/20"
               >
                 <CheckCircle2 className="w-6 h-6" />
@@ -1379,7 +1219,10 @@ export default function App() {
               </button>
             ) : (
               <button
-              onClick={() => setCurrentStepIndex(prev => prev + 1)}
+                onClick={() => {
+                  setAutoNextTimer(5);
+                  setCurrentStepIndex(prev => prev + 1);
+                }}
                 className="flex-1 bg-cute-pink text-white py-6 rounded-[2rem] font-bold text-xl flex items-center justify-center gap-3 hover:scale-[1.02] transition-all shadow-lg shadow-cute-pink/20"
               >
                 Next Step
@@ -1493,16 +1336,6 @@ export default function App() {
               </div>
 
               <div className="space-y-6">
-                {resetSent && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-4 bg-green-50 border-2 border-green-100 rounded-2xl flex items-center gap-3 text-green-600 text-sm font-bold"
-                  >
-                    <ShieldCheck className="w-5 h-5 flex-shrink-0" />
-                    Password reset email sent! Check your inbox. 📧
-                  </motion.div>
-                )}
                 {authError && (
                   <motion.div 
                     initial={{ opacity: 0, y: -10 }}
@@ -1585,34 +1418,6 @@ export default function App() {
                     </button>
                   </div>
 
-                  {!isSignup && (
-                    <div className="flex justify-end mt-2">
-                      <button 
-                        onClick={async () => {
-                          if (!loginForm.username) {
-                            setAuthError("Please enter your email address first! 📧");
-                            return;
-                          }
-                          if (!isValidEmail(loginForm.username)) {
-                            setAuthError("Please enter a valid email address! 📧");
-                            return;
-                          }
-                          try {
-                            await sendPasswordResetEmail(auth, loginForm.username);
-                            setResetSent(true);
-                            setAuthError(null);
-                            setTimeout(() => setResetSent(false), 5000);
-                          } catch (error: any) {
-                            console.error("Reset error", error);
-                            setAuthError("Failed to send reset email. Please try again.");
-                          }
-                        }}
-                        className="text-xs font-bold text-cute-pink hover:underline"
-                      >
-                        Forgot Password?
-                      </button>
-                    </div>
-                  )}
 
                   {isSignup && (
                     <div className="space-y-2 mt-4">
@@ -1722,35 +1527,40 @@ export default function App() {
                     setAuthLoading(true);
                     try {
                       if (isSignup) {
-                        const userCredential = await createUserWithEmailAndPassword(auth, loginForm.email, loginForm.password);
-                        await updateProfile(userCredential.user, { displayName: loginForm.username });
-                        
-                        // Create user document in Firestore
-                        await setDoc(doc(db, 'users', userCredential.user.uid), {
+                        const newUser = await apiService.signup({
                           username: loginForm.username,
                           email: loginForm.email,
-                          dob: loginForm.dob,
-                          favorites: [],
-                          history: [],
-                          createdAt: serverTimestamp()
+                          password: loginForm.password,
+                          dob: loginForm.dob
                         });
+                        setUser({
+                          username: newUser.username,
+                          email: newUser.email,
+                          role: newUser.role,
+                          dob: newUser.dob
+                        });
+                        setFavorites([]);
+                        setHistory([]);
                       } else {
-                        // For login, we use the username field as email
-                        const email = loginForm.username;
-                        await signInWithEmailAndPassword(auth, email, loginForm.password);
+                        const loggedInUser = await apiService.login({
+                          email: loginForm.username, // Using username field as email in form
+                          password: loginForm.password
+                        });
+                        setUser({
+                          username: loggedInUser.username,
+                          email: loggedInUser.email,
+                          role: loggedInUser.role,
+                          dob: loggedInUser.dob
+                        });
+                        setFavorites(loggedInUser.favorites || []);
+                        setHistory(loggedInUser.history || []);
                       }
                       setIsLoginOpen(false);
                       setIsSignup(false);
                       setLoginForm({ username: '', email: '', password: '', confirmPassword: '', dob: '' });
                     } catch (error: any) {
                       console.error("Auth error", error);
-                      let message = "Authentication failed. Please try again.";
-                      if (error.code === 'auth/user-not-found') message = "User not found. Please check your email.";
-                      if (error.code === 'auth/wrong-password') message = "Incorrect password. Please try again.";
-                      if (error.code === 'auth/email-already-in-use') message = "Email already in use. Try signing in!";
-                      if (error.code === 'auth/weak-password') message = "Password is too weak.";
-                      if (error.code === 'auth/invalid-email') message = "Please enter a valid email address.";
-                      setAuthError(message);
+                      setAuthError(error.message || "Authentication failed. Please try again.");
                     } finally {
                       setAuthLoading(false);
                     }
@@ -2169,9 +1979,11 @@ export default function App() {
                 <span className="text-sm font-bold text-brand-950 leading-none">{user.username}</span>
               </div>
               <button 
-                onClick={() => {
+                onClick={async () => {
+                  await apiService.logout();
                   setUser(null);
-                  localStorage.removeItem('snap2serve_user');
+                  setFavorites([]);
+                  setHistory([]);
                 }}
                 className="ml-4 p-2 hover:bg-cute-pink/10 rounded-xl text-brand-400 hover:text-cute-pink transition-all"
                 title="Sign Out"
@@ -2187,15 +1999,6 @@ export default function App() {
               <LogIn className="w-6 h-6 text-white" />
             </button>
           )}
-          <button 
-            onClick={() => {
-              signOut(auth);
-              setUser(null);
-            }}
-            className="hidden" // Hidden but kept for logic reference if needed
-          >
-            Sign Out
-          </button>
           <button 
             onClick={() => setStep('history')}
             className={cn(
