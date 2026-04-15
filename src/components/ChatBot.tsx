@@ -202,7 +202,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ currentRecipe }) => {
       >
         {isOpen ? <X className="w-8 h-8" /> : <MessageCircle className="w-8 h-8" />}
         {!isOpen && (
-          <span className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex flex-col items-center justify-center hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20" />
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-cute-blue rounded-full border-2 border-white animate-pulse" />
         )}
       </motion.button>
     </div>

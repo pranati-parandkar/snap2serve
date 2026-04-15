@@ -130,7 +130,7 @@ export default function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
-  const [user, setUser] = useState<{ username: string; email: string; role?: string; dob?: string } | null>(null);
+  const [user, setUser] = useState<{ id: string; username: string; email: string; role?: string; dob?: string } | null>(null);
   const [loginForm, setLoginForm] = useState({ username: '', email: '', password: '', confirmPassword: '', dob: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [showRating, setShowRating] = useState(false);
@@ -138,7 +138,6 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [exploreRecipes, setExploreRecipes] = useState<Recipe[]>([]);
-  const [autoNextTimer, setAutoNextTimer] = useState<number | null>(null);
   const sessionRef = useRef<string | null>(null);
 
   const getPasswordStrength = (password: string) => {
@@ -207,6 +206,7 @@ export default function App() {
         const userData = await apiService.getMe();
         if (userData) {
           setUser({
+            id: userData._id,
             username: userData.username,
             email: userData.email,
             role: userData.role || 'client',
@@ -250,7 +250,7 @@ export default function App() {
 
     const startSession = async () => {
       try {
-        const data = await apiService.startSession(visitorId!, user?.email);
+        const data = await apiService.startSession(visitorId!, user?.id);
         if (data.sessionId) {
           sessionRef.current = data.sessionId;
         }
@@ -468,25 +468,6 @@ export default function App() {
       }));
     }
   }, [detectedIngredients]);
-
-  useEffect(() => {
-    if (step === 'cooking' && selectedRecipe && currentStepIndex < selectedRecipe.instructions.length - 1) {
-      setAutoNextTimer(5);
-      const interval = setInterval(() => {
-        setAutoNextTimer(prev => {
-          if (prev === null) return null;
-          if (prev <= 1) {
-            setCurrentStepIndex(curr => curr + 1);
-            return 5;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      return () => clearInterval(interval);
-    } else {
-      setAutoNextTimer(null);
-    }
-  }, [step, currentStepIndex, selectedRecipe]);
 
   const toggleFavorite = async (recipe: Recipe) => {
     if (!recipe || !recipe.id) return;
@@ -1112,16 +1093,23 @@ export default function App() {
                 Start Cooking!
               </button>
 
-              <button 
-                onClick={() => {
-                  const event = new CustomEvent('open-chatbot', { detail: `I have a question about the ${selectedRecipe.title} recipe.` });
-                  window.dispatchEvent(event);
-                }}
-                className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex items-center justify-center hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
-              >
-                <Bot className="absolute left-[15%] w-7 h-7" />
-                <span>Ask AI about this recipe</span>
-              </button>
+             <button 
+  onClick={() => {
+    const event = new CustomEvent('open-chatbot', { 
+      detail: `I have a question about the ${selectedRecipe.title} recipe.` 
+    });
+    window.dispatchEvent(event);
+  }}
+  className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl flex items-center justify-between px-6 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
+>
+  {/* Left side - Bot icon */}
+  <Bot className="w-7 h-7" />
+
+  {/* Right side - Text */}
+  <span className="flex-1 text-right pr-2">
+    Ask AI about this recipe
+  </span>
+</button>
             </div>
           </div>
         </div>
@@ -1177,11 +1165,6 @@ export default function App() {
                 <h3 className="text-3xl md:text-5xl font-display text-brand-950 leading-tight">
                   {currentStep}
                 </h3>
-                {autoNextTimer !== null && (
-                  <p className="mt-6 text-cute-pink font-bold animate-pulse">
-                    Next step in {autoNextTimer}s...
-                  </p>
-                )}
               </div>
 
               <button 
@@ -1209,7 +1192,6 @@ export default function App() {
             {currentStepIndex === selectedRecipe.instructions.length - 1 ? (
               <button
                 onClick={() => {
-                  setAutoNextTimer(null);
                   setShowRating(true);
                 }}
                 className="flex-1 bg-cute-mint text-white py-6 rounded-[2rem] font-bold text-xl flex items-center justify-center gap-3 hover:scale-[1.02] transition-all shadow-lg shadow-cute-mint/20"
@@ -1220,7 +1202,6 @@ export default function App() {
             ) : (
               <button
                 onClick={() => {
-                  setAutoNextTimer(5);
                   setCurrentStepIndex(prev => prev + 1);
                 }}
                 className="flex-1 bg-cute-pink text-white py-6 rounded-[2rem] font-bold text-xl flex items-center justify-center gap-3 hover:scale-[1.02] transition-all shadow-lg shadow-cute-pink/20"
@@ -1534,6 +1515,7 @@ export default function App() {
                           dob: loginForm.dob
                         });
                         setUser({
+                          id: newUser._id,
                           username: newUser.username,
                           email: newUser.email,
                           role: newUser.role,
@@ -1547,6 +1529,7 @@ export default function App() {
                           password: loginForm.password
                         });
                         setUser({
+                          id: loggedInUser._id,
                           username: loggedInUser.username,
                           email: loggedInUser.email,
                           role: loggedInUser.role,
