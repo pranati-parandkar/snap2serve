@@ -1,7 +1,115 @@
 import { GoogleGenAI } from "@google/genai";
-import { Recipe, Ingredient, UserPreferences } from "../types";
+import { Recipe, Ingredient, UserPreferences, RecommendationResult } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+
+export async function getSmartRecommendation(
+  options: Recipe[],
+  preferences: UserPreferences,
+  history: Recipe[],
+  favorites: Recipe[]
+): Promise<RecommendationResult | null> {
+  try {
+    const prompt = `You are an intelligent food recommendation system.
+    Your task is to select the BEST possible food item based on user constraints, preferences, and available options.
+
+    USER CONSTRAINTS:
+    - Budget: ₹${preferences.budget || 500}
+    - Max Time: ${preferences.maxTime} minutes
+    - Diet: ${preferences.dietaryRestrictions.join(", ") || "Any"}
+
+    USER TASTE PROFILE:
+    - Spice Preference: ${preferences.spicePreference || "Medium"}
+    - Cooking Style: ${preferences.cookingStyle || "Quick"}
+    - Past Preferences: ${favorites.map(f => f.title).join(", ") || "None"}
+    - Recent Items: ${history.slice(0, 3).map(h => h.title).join(", ") || "None"}
+
+    AVAILABLE OPTIONS:
+    ${JSON.stringify(options.map(o => ({
+      name: o.title,
+      price: o.price || Math.floor(Math.random() * 200) + 50,
+      time: o.cookingTime,
+      type: o.dietaryInfo.includes("Veg") ? "veg" : "non-veg",
+      spice: o.spiceLevel || "Medium"
+    })))}
+
+    INSTRUCTIONS:
+    - First remove options that violate STRICT constraints (budget, diet, time)
+    - Then evaluate remaining options
+    - Consider: taste match, time efficiency, cost efficiency, overall suitability
+    - Select ONLY ONE BEST item
+
+    OUTPUT FORMAT (STRICT JSON):
+    {
+      "best_item": "name",
+      "reason": "clear explanation referencing constraints + taste",
+      "score_summary": {
+        "taste_match": "high/medium/low",
+        "budget_fit": "good/average/poor",
+        "time_fit": "good/average/poor"
+      }
+    }`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        systemInstruction: "You are an intelligent food recommendation system. Always return valid JSON."
+      }
+    });
+
+    const text = response.text || "null";
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Failed to get smart recommendation", e);
+    return null;
+  }
+}
+
+export async function generateFoodOptions(
+  constraints: { budget: number; time: number; diet: string; goal: string; spice: string }
+): Promise<Recipe[]> {
+  try {
+    const prompt = `Generate 4 diverse food options (recipes) based on these constraints:
+    - Budget: ₹${constraints.budget}
+    - Available Time: ${constraints.time} minutes
+    - Diet Preference: ${constraints.diet}
+    - Goal: ${constraints.goal}
+    - Spice Level: ${constraints.spice}
+
+    Return ONLY a JSON array of recipe objects with this structure:
+    [{
+      "id": "unique-id",
+      "title": "Recipe Title",
+      "description": "Short description",
+      "ingredients": ["item 1", "item 2"],
+      "instructions": ["step 1", "step 2"],
+      "cookingTime": 30,
+      "difficulty": "Easy",
+      "cuisine": "Cuisine Type",
+      "calories": 450,
+      "dietaryInfo": ["Vegan", "Gluten-Free"],
+      "price": 150,
+      "spiceLevel": "Medium"
+    }]`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        systemInstruction: "You are a professional chef. Always return valid JSON."
+      }
+    });
+
+    const text = response.text || "[]";
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Failed to generate food options", e);
+    return [];
+  }
+}
 
 export async function detectIngredients(base64Image: string): Promise<Ingredient[]> {
   try {
@@ -87,7 +195,9 @@ export async function generateRecipes(
       "difficulty": "Easy",
       "cuisine": "Cuisine Type",
       "calories": 450,
-      "dietaryInfo": ["Vegan", "Gluten-Free"]
+      "dietaryInfo": ["Vegan", "Gluten-Free"],
+      "price": 150,
+      "spiceLevel": "Medium"
     }]`;
 
     const response = await ai.models.generateContent({
@@ -115,6 +225,7 @@ export async function generateRecipes(
 export async function generateSpeech(text: string): Promise<string | undefined> {
   return undefined;
 }
+
 export async function getChatResponse(
   message: string,
   chatHistory: { role: "user" | "model"; parts: { text: string }[] }[],
@@ -160,3 +271,4 @@ export async function getChatResponse(
     return "Oops! I'm having a little trouble thinking right now. Could you try asking again? 🍳";
   }
 }
+

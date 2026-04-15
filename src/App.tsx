@@ -76,8 +76,8 @@ import {
   Cake,
   TrendingUp
 } from 'lucide-react';
-import { Recipe, Ingredient, UserPreferences, Session, AnalyticsData } from './types';
-import { detectIngredients, generateRecipes, generateSpeech } from './services/geminiService';
+import { Recipe, Ingredient, UserPreferences, Session, AnalyticsData, RecommendationResult } from './types';
+import { detectIngredients, generateRecipes, generateSpeech, getSmartRecommendation, generateFoodOptions } from './services/geminiService';
 import { fetchRecipeImage } from './services/pixabayService';
 import { ChatBot } from './components/ChatBot';
 import { cn } from './lib/utils';
@@ -120,7 +120,13 @@ function pcmToWav(pcmBase64: string, sampleRate: number = 24000): string {
 }
 
 export default function App() {
-  const [step, setStep] = useState<'home' | 'detecting' | 'ingredients' | 'recipes' | 'detail' | 'history' | 'cooking' | 'favorites' | 'explore' | 'analytics'>('home');
+  const [step, setStep] = useState<'home' | 'detecting' | 'ingredients' | 'recipes' | 'detail' | 'history' | 'cooking' | 'favorites' | 'explore' | 'analytics' | 'smart-suggestions'>('home');
+  const [previousStep, setPreviousStep] = useState<string | null>(null);
+
+  const navigateTo = (newStep: any) => {
+    setPreviousStep(step);
+    setStep(newStep);
+  };
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [detectedIngredients, setDetectedIngredients] = useState<Ingredient[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -138,6 +144,15 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [exploreRecipes, setExploreRecipes] = useState<Recipe[]>([]);
+  const [smartSuggestionsForm, setSmartSuggestionsForm] = useState({
+    budget: 500,
+    time: 30,
+    diet: 'both',
+    goal: 'Quick Snack',
+    spice: 'Medium'
+  });
+  const [smartOptions, setSmartOptions] = useState<Recipe[]>([]);
+  const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
   const sessionRef = useRef<string | null>(null);
 
   const getPasswordStrength = (password: string) => {
@@ -315,7 +330,13 @@ export default function App() {
     dietaryRestrictions: [],
     allergies: [],
     maxTime: 45,
+    budget: 500,
+    spicePreference: 'Medium',
+    cookingStyle: 'Quick'
   });
+
+  const [recommendation, setRecommendation] = useState<RecommendationResult | null>(null);
+  const [isRecommending, setIsRecommending] = useState(false);
 
   // Sync Preferences to Backend
   useEffect(() => {
@@ -444,9 +465,11 @@ export default function App() {
           ingredients: t.ingredients,
           instructions: t.instructions,
           dietaryInfo: ['Healthy', cuisine],
-          imageUrl: undefined as string | undefined
+          imageUrl: undefined as string | undefined,
+          price: t.cal / 2 + Math.floor(Math.random() * 50), // Estimate price based on calories
+          spiceLevel: ['Low', 'Medium', 'High'][Math.floor(Math.random() * 3)] as any
         }))
-      );
+      ).sort(() => Math.random() - 0.5).slice(0, 18);
 
       // Fetch images for explore recipes
       const withImages = await Promise.all(baseRecipes.map(async (r) => {
@@ -454,7 +477,7 @@ export default function App() {
         return { ...r, imageUrl };
       }));
 
-      setExploreRecipes(withImages.sort(() => Math.random() - 0.5));
+      setExploreRecipes(withImages);
     };
 
     initializeExplore();
@@ -562,6 +585,21 @@ export default function App() {
       alert("Failed to generate recipes. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGetRecommendation = async () => {
+    const options = step === 'recipes' ? recipes : exploreRecipes;
+    if (options.length === 0) return;
+
+    setIsRecommending(true);
+    try {
+      const result = await getSmartRecommendation(options, preferences, history, favorites);
+      setRecommendation(result);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsRecommending(false);
     }
   };
 
@@ -903,8 +941,18 @@ export default function App() {
           </button>
           <h2 className="text-4xl font-display text-cute-pink">Yummy Choices! 😋</h2>
         </div>
-        <div className="text-brand-500 text-sm font-display italic">
-          Found {recipes.length} fun recipes
+        <div className="flex items-center gap-4">
+          <div className="text-brand-500 text-sm font-display italic hidden md:block">
+            Found {recipes.length} fun recipes
+          </div>
+          <button 
+            onClick={handleGetRecommendation}
+            disabled={isRecommending}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cute-yellow to-orange-400 text-white rounded-2xl font-bold shadow-lg shadow-cute-yellow/20 hover:scale-105 transition-all disabled:opacity-50"
+          >
+            {isRecommending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+            Smart Suggestion
+          </button>
         </div>
       </div>
 
@@ -916,7 +964,7 @@ export default function App() {
             onClick={() => {
               setSelectedRecipe(recipe);
               addToHistory(recipe);
-              setStep('detail');
+              navigateTo('detail');
             }}
           >
             <div className="h-56 bg-brand-100 relative overflow-hidden">
@@ -980,7 +1028,7 @@ export default function App() {
         className="max-w-5xl mx-auto px-4 py-8"
       >
         <div className="flex items-center justify-between mb-8">
-          <button onClick={() => setStep('recipes')} className="flex items-center gap-2 text-brand-600 hover:text-cute-pink font-bold transition-colors">
+          <button onClick={() => setStep(previousStep === 'smart-suggestions' ? 'smart-suggestions' : 'recipes')} className="flex items-center gap-2 text-brand-600 hover:text-cute-pink font-bold transition-colors">
             <ArrowLeft className="w-5 h-5" />
             Back to yummy list
           </button>
@@ -1093,7 +1141,7 @@ export default function App() {
                 Start Cooking!
               </button>
 
-             <button 
+              <button 
   onClick={() => {
     const event = new CustomEvent('open-chatbot', { 
       detail: `I have a question about the ${selectedRecipe.title} recipe.` 
@@ -1269,6 +1317,91 @@ export default function App() {
       </motion.div>
     );
   };
+
+  const renderRecommendationModal = () => (
+    <AnimatePresence>
+      {recommendation && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setRecommendation(null)}
+            className="absolute inset-0 bg-brand-950/60 backdrop-blur-xl"
+          />
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="relative bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl border-8 border-cute-pink/10 overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-cute-pink via-cute-yellow to-cute-mint" />
+            
+            <button 
+              onClick={() => setRecommendation(null)}
+              className="absolute top-6 right-6 p-2 hover:bg-brand-50 rounded-xl transition-colors"
+            >
+              <X className="w-6 h-6 text-brand-400" />
+            </button>
+
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-cute-yellow/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <Sparkles className="w-10 h-10 text-cute-yellow" />
+              </div>
+              <h2 className="text-3xl font-display text-brand-950 mb-2">AI Smart Suggestion</h2>
+              <p className="text-brand-500 font-medium italic">"The perfect match for your cravings!"</p>
+            </div>
+
+            <div className="bg-brand-50 rounded-3xl p-8 mb-8 border-2 border-brand-100">
+              <h3 className="text-2xl font-display text-cute-pink mb-4">{recommendation.best_item}</h3>
+              <p className="text-brand-700 leading-relaxed mb-6">{recommendation.reason}</p>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-white p-4 rounded-2xl text-center shadow-sm border border-brand-100">
+                  <p className="text-[10px] uppercase tracking-wider text-brand-400 font-bold mb-1">Taste</p>
+                  <p className={cn(
+                    "font-bold capitalize",
+                    recommendation.score_summary.taste_match === 'high' ? "text-green-500" : "text-cute-yellow"
+                  )}>{recommendation.score_summary.taste_match}</p>
+                </div>
+                <div className="bg-white p-4 rounded-2xl text-center shadow-sm border border-brand-100">
+                  <p className="text-[10px] uppercase tracking-wider text-brand-400 font-bold mb-1">Budget</p>
+                  <p className={cn(
+                    "font-bold capitalize",
+                    recommendation.score_summary.budget_fit === 'good' ? "text-green-500" : "text-cute-yellow"
+                  )}>{recommendation.score_summary.budget_fit}</p>
+                </div>
+                <div className="bg-white p-4 rounded-2xl text-center shadow-sm border border-brand-100">
+                  <p className="text-[10px] uppercase tracking-wider text-brand-400 font-bold mb-1">Time</p>
+                  <p className={cn(
+                    "font-bold capitalize",
+                    recommendation.score_summary.time_fit === 'good' ? "text-green-500" : "text-cute-yellow"
+                  )}>{recommendation.score_summary.time_fit}</p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                const recipe = [...recipes, ...exploreRecipes, ...smartOptions].find(r => r.title === recommendation.best_item);
+                if (recipe) {
+                  setSelectedRecipe(recipe);
+                  navigateTo('detail');
+                  setRecommendation(null);
+                } else {
+                  setRecommendation(null);
+                }
+              }}
+              className="w-full bg-cute-pink text-white py-5 rounded-3xl font-bold text-xl shadow-lg shadow-cute-pink/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-3"
+            >
+              <Utensils className="w-6 h-6" />
+              Cook This Now!
+            </button>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
 
   const renderLoginModal = () => (
     <AnimatePresence>
@@ -1604,7 +1737,7 @@ export default function App() {
                 onClick={() => {
                   setSelectedRecipe(recipe);
                   addToHistory(recipe);
-                  setStep('detail');
+                  navigateTo('detail');
                 }}
               >
                 <div className="h-48 bg-brand-100 relative overflow-hidden">
@@ -1640,6 +1773,198 @@ export default function App() {
     );
   };
 
+  const renderSmartSuggestions = () => {
+    const handleGetSmartOptions = async () => {
+      setIsGeneratingOptions(true);
+      try {
+        const options = await generateFoodOptions(smartSuggestionsForm);
+        
+        // Fetch images for smart options
+        const withImages = await Promise.all(options.map(async (r) => {
+          const imageUrl = await fetchRecipeImage(r.title);
+          return { ...r, imageUrl };
+        }));
+        
+        setSmartOptions(withImages);
+        
+        // Automatically trigger recommendation for these options
+        setIsRecommending(true);
+        const result = await getSmartRecommendation(withImages, preferences, history, favorites);
+        setRecommendation(result);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsGeneratingOptions(false);
+        setIsRecommending(false);
+      }
+    };
+
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-4xl mx-auto px-4 py-8"
+      >
+        <div className="text-center mb-12">
+          <div className="w-20 h-20 bg-cute-yellow/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <Sparkles className="w-10 h-10 text-cute-yellow" />
+          </div>
+          <h2 className="text-4xl md:text-5xl font-display text-brand-950 mb-4">Smart Food Suggestions</h2>
+          <p className="text-brand-500 text-lg max-w-2xl mx-auto">Tell us what you're craving and your constraints, and our AI Chef will find the perfect match for you! 🪄🍳</p>
+        </div>
+
+        <div className="bg-white p-10 rounded-[3rem] shadow-xl border-8 border-cute-yellow/10 space-y-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <label className="text-sm font-bold text-brand-500 mb-3 block">Budget (₹)? 💸</label>
+              <div className="flex items-center gap-4">
+                <input 
+                  type="range" 
+                  min="50" 
+                  max="2000" 
+                  step="50"
+                  value={smartSuggestionsForm.budget}
+                  onChange={(e) => setSmartSuggestionsForm({...smartSuggestionsForm, budget: parseInt(e.target.value)})}
+                  className="flex-1 accent-cute-yellow h-2 bg-brand-100 rounded-full appearance-none cursor-pointer"
+                />
+                <span className="font-display text-2xl min-w-[70px] text-cute-yellow">₹{smartSuggestionsForm.budget}</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-brand-500 mb-3 block">Available Time? ⏱️</label>
+              <div className="flex items-center gap-4">
+                <input 
+                  type="range" 
+                  min="5" 
+                  max="120" 
+                  step="5"
+                  value={smartSuggestionsForm.time}
+                  onChange={(e) => setSmartSuggestionsForm({...smartSuggestionsForm, time: parseInt(e.target.value)})}
+                  className="flex-1 accent-cute-pink h-2 bg-brand-100 rounded-full appearance-none cursor-pointer"
+                />
+                <span className="font-display text-2xl min-w-[70px] text-cute-pink">{smartSuggestionsForm.time}m</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div>
+              <label className="text-sm font-bold text-brand-500 mb-3 block">Diet Preference? 🥗</label>
+              <div className="flex gap-2">
+                {['veg', 'non-veg', 'both'].map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setSmartSuggestionsForm({...smartSuggestionsForm, diet: type})}
+                    className={cn(
+                      "flex-1 py-3 rounded-2xl text-xs font-bold border-2 transition-all capitalize",
+                      smartSuggestionsForm.diet === type
+                        ? "bg-cute-mint text-white border-cute-mint shadow-md" 
+                        : "bg-white text-brand-600 border-brand-100 hover:border-cute-mint/40"
+                    )}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-brand-500 mb-3 block">Spice Level? 🌶️</label>
+              <div className="flex gap-2">
+                {['Mild', 'Medium', 'Spicy'].map(level => (
+                  <button
+                    key={level}
+                    onClick={() => setSmartSuggestionsForm({...smartSuggestionsForm, spice: level})}
+                    className={cn(
+                      "flex-1 py-3 rounded-2xl text-xs font-bold border-2 transition-all",
+                      smartSuggestionsForm.spice === level
+                        ? "bg-orange-500 text-white border-orange-500 shadow-md" 
+                        : "bg-white text-brand-600 border-brand-100 hover:border-orange-500/40"
+                    )}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-brand-500 mb-3 block">What's the Goal? 🎯</label>
+              <select 
+                value={smartSuggestionsForm.goal}
+                onChange={(e) => setSmartSuggestionsForm({...smartSuggestionsForm, goal: e.target.value})}
+                className="w-full py-3 px-4 rounded-2xl text-sm font-bold border-2 border-brand-100 focus:border-cute-pink focus:outline-none bg-white"
+              >
+                {['Quick Snack', 'Healthy', 'Save Money', 'Try Something New'].map(goal => (
+                  <option key={goal} value={goal}>{goal}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <button
+            onClick={handleGetSmartOptions}
+            disabled={isGeneratingOptions || isRecommending}
+            className="w-full bg-brand-950 text-white py-6 rounded-3xl font-bold text-xl shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+          >
+            {isGeneratingOptions || isRecommending ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : (
+              <Sparkles className="w-6 h-6" />
+            )}
+            Find My Perfect Meal
+          </button>
+        </div>
+
+        {smartOptions.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-16"
+          >
+            <h3 className="text-2xl font-display text-brand-950 mb-8 text-center">Available Food Options</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {smartOptions.map((option) => (
+                <div 
+                  key={option.id}
+                  className="bg-white p-6 rounded-3xl border-4 border-brand-50 shadow-sm hover:shadow-md transition-shadow flex items-center gap-6"
+                >
+                  <div className="w-20 h-20 bg-brand-50 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
+                    {option.imageUrl ? (
+                      <img src={option.imageUrl} alt={option.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <Utensils className="w-8 h-8 text-brand-300" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-display text-xl text-brand-900">{option.title}</h4>
+                    <div className="flex gap-3 mt-2">
+                      <span className="text-xs font-bold text-cute-pink">₹{option.price}</span>
+                      <span className="text-xs font-bold text-brand-400">•</span>
+                      <span className="text-xs font-bold text-brand-400">{option.cookingTime}m</span>
+                      <span className="text-xs font-bold text-brand-400">•</span>
+                      <span className="text-xs font-bold text-brand-400 capitalize">{option.spiceLevel}</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setSelectedRecipe(option);
+                      navigateTo('detail');
+                    }}
+                    className="p-3 bg-brand-50 hover:bg-cute-pink/10 text-brand-400 hover:text-cute-pink rounded-xl transition-all"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
+    );
+  };
+
   const renderExplore = () => {
     return (
       <motion.div 
@@ -1647,11 +1972,21 @@ export default function App() {
         animate={{ opacity: 1 }}
         className="max-w-6xl mx-auto px-4 py-8"
       >
-        <div className="flex items-center gap-4 mb-12">
-          <button onClick={() => setStep('home')} className="p-3 bg-white hover:bg-cute-pink/10 rounded-2xl transition-colors shadow-sm">
-            <ArrowLeft className="w-6 h-6 text-cute-pink" />
+        <div className="flex items-center justify-between mb-12">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setStep('home')} className="p-3 bg-white hover:bg-cute-pink/10 rounded-2xl transition-colors shadow-sm">
+              <ArrowLeft className="w-6 h-6 text-cute-pink" />
+            </button>
+            <h2 className="text-4xl font-display text-cute-pink">Explore Trending Recipes</h2>
+          </div>
+          <button 
+            onClick={handleGetRecommendation}
+            disabled={isRecommending}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cute-yellow to-orange-400 text-white rounded-2xl font-bold shadow-lg shadow-cute-yellow/20 hover:scale-105 transition-all disabled:opacity-50"
+          >
+            {isRecommending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+            Smart Suggestion
           </button>
-          <h2 className="text-4xl font-display text-cute-pink">Explore Trending Recipes</h2>
         </div>
 
         {exploreRecipes.length === 0 ? (
@@ -1667,7 +2002,8 @@ export default function App() {
                 className="recipe-card bg-white rounded-[2.5rem] overflow-hidden border-4 border-white shadow-lg flex flex-col cursor-pointer group"
                 onClick={() => {
                   setSelectedRecipe(item);
-                  setStep('detail');
+                  addToHistory(item);
+                  navigateTo('detail');
                 }}
               >
                 <div className="h-56 bg-brand-100 relative overflow-hidden">
@@ -1731,7 +2067,7 @@ export default function App() {
               onClick={() => {
                 setSelectedRecipe(recipe);
                 addToHistory(recipe);
-                setStep('detail');
+                navigateTo('detail');
               }}
             >
               <div className="h-48 bg-brand-100 relative overflow-hidden">
@@ -1924,6 +2260,16 @@ export default function App() {
             Explore
           </button>
           <button 
+            onClick={() => setStep('smart-suggestions')}
+            className={cn(
+              "flex items-center gap-2 text-sm font-bold transition-colors",
+              step === 'smart-suggestions' ? "text-cute-pink" : "text-brand-600 hover:text-cute-pink"
+            )}
+          >
+            <Sparkles className="w-4 h-4" />
+            Smart Suggestions
+          </button>
+          <button 
             onClick={() => setStep('favorites')}
             className={cn(
               "flex items-center gap-2 text-sm font-bold transition-colors",
@@ -2020,6 +2366,16 @@ export default function App() {
             <span className="text-[10px] font-bold uppercase tracking-widest">Explore</span>
           </button>
           <button 
+            onClick={() => setStep('smart-suggestions')}
+            className={cn(
+              "flex flex-col items-center gap-1 transition-colors",
+              step === 'smart-suggestions' ? "text-cute-pink" : "text-brand-400"
+            )}
+          >
+            <Sparkles className="w-6 h-6" />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Smart</span>
+          </button>
+          <button 
             onClick={() => setStep('favorites')}
             className={cn(
               "flex flex-col items-center gap-1 transition-colors",
@@ -2052,6 +2408,7 @@ export default function App() {
           {step === 'history' && renderHistory()}
           {step === 'favorites' && renderFavorites()}
           {step === 'explore' && renderExplore()}
+          {step === 'smart-suggestions' && renderSmartSuggestions()}
           {step === 'cooking' && renderCooking()}
           {step === 'analytics' && renderAnalytics()}
         </AnimatePresence>
@@ -2095,6 +2452,7 @@ export default function App() {
         </div>
       </footer>
       <ChatBot currentRecipe={selectedRecipe} />
+      {renderRecommendationModal()}
     </div>
   );
 }
