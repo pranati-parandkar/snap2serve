@@ -81,7 +81,7 @@ import { detectIngredients, generateRecipes, generateSpeech, getSmartRecommendat
 import { fetchRecipeImage } from './services/pixabayService';
 import { ChatBot } from './components/ChatBot';
 import { cn } from './lib/utils';
-import { apiService } from './services/apiservice';
+import { apiService } from './services/apiService';
 
 function pcmToWav(pcmBase64: string, sampleRate: number = 24000): string {
   const pcmData = Uint8Array.from(atob(pcmBase64), c => c.charCodeAt(0));
@@ -154,6 +154,13 @@ export default function App() {
   const [smartOptions, setSmartOptions] = useState<Recipe[]>([]);
   const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
   const sessionRef = useRef<string | null>(null);
+  const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
+  const isStartingSession = useRef(false);
+  const userIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    userIdRef.current = user?.id || null;
+  }, [user?.id]);
 
   const getPasswordStrength = (password: string) => {
     if (!password) return { label: '', color: '', score: 0 };
@@ -264,28 +271,48 @@ export default function App() {
     }
 
     const startSession = async () => {
+      if (isStartingSession.current || sessionRef.current) return;
+      isStartingSession.current = true;
       try {
-        const data = await apiService.startSession(visitorId!, user?.id);
+        const data = await apiService.startSession(visitorId!, userIdRef.current || undefined);
         if (data.sessionId) {
           sessionRef.current = data.sessionId;
+          // Start heartbeat
+          if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+          heartbeatRef.current = setInterval(async () => {
+            if (sessionRef.current) {
+              try {
+                await apiService.heartbeat(sessionRef.current, userIdRef.current || undefined);
+              } catch (e) {
+                console.error("Heartbeat failed", e);
+              }
+            }
+          }, 30000); // Every 30 seconds
         }
       } catch (error) {
         console.error("Failed to start session", error);
+      } finally {
+        isStartingSession.current = false;
       }
     };
 
-    startSession();
-
     const endSession = async () => {
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
       if (sessionRef.current) {
+        const sid = sessionRef.current;
+        sessionRef.current = null;
         try {
-          await apiService.endSession(sessionRef.current);
-          sessionRef.current = null;
+          await apiService.endSession(sid);
         } catch (error) {
           console.error("Failed to end session", error);
         }
       }
     };
+
+    startSession();
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
@@ -303,7 +330,7 @@ export default function App() {
       window.removeEventListener('beforeunload', endSession);
       endSession();
     };
-  }, [user]);
+  }, []); // Run only once on mount
 
   // Fetch Analytics
   useEffect(() => {
@@ -1301,6 +1328,9 @@ export default function App() {
 
                 <button
                   onClick={() => {
+                    if (selectedRecipe) {
+                      addToHistory(selectedRecipe);
+                    }
                     alert(`Thanks for the ${rating} star rating! 💖`);
                     setShowRating(false);
                     setRating(0);
@@ -1386,6 +1416,7 @@ export default function App() {
                 const recipe = [...recipes, ...exploreRecipes, ...smartOptions].find(r => r.title === recommendation.best_item);
                 if (recipe) {
                   setSelectedRecipe(recipe);
+                  addToHistory(recipe);
                   navigateTo('detail');
                   setRecommendation(null);
                 } else {
@@ -1950,6 +1981,7 @@ export default function App() {
                   <button 
                     onClick={() => {
                       setSelectedRecipe(option);
+                      addToHistory(option);
                       navigateTo('detail');
                     }}
                     className="p-3 bg-brand-50 hover:bg-cute-pink/10 text-brand-400 hover:text-cute-pink rounded-xl transition-all"

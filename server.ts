@@ -7,33 +7,49 @@ import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import cookieParser from "cookie-parser";
-import { User, Session } from "./models/Models.js";
+import { User, Session } from "./models/Models";
 
 dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3000;
+
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_for_dev";
 const MONGODB_URI = process.env.MONGODB_URI;
 
 // Connect to MongoDB
+console.log("Starting server with MONGODB_URI:", MONGODB_URI ? "Defined" : "Undefined");
 if (MONGODB_URI) {
   mongoose.connect(MONGODB_URI)
     .then(() => console.log("Connected to MongoDB"))
     .catch(err => {
       console.error("MongoDB connection error:", err.message);
-      console.log("TIP: Make sure your MONGODB_URI is correct and accessible.");
     });
-} else {
-  console.warn("WARNING: MONGODB_URI is not defined in environment variables.");
-  console.log("TIP: Add MONGODB_URI to your environment variables in the Settings menu.");
 }
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cookieParser());
+
+// Database Connection Check Middleware
+const checkDbConnection = (req: any, res: any, next: any) => {
+  if (mongoose.connection.readyState !== 1) {
+    console.log(`❌ DB not connected for ${req.method} ${req.url}`);
+    return res.status(503).json({ 
+      message: "Database not connected. Please check your MONGODB_URI in the Settings menu.",
+      tip: "If you haven't set up MongoDB yet, you'll need a MongoDB Atlas URI or similar."
+    });
+  }
+  next();
+};
 
 // Auth Middleware
 const authenticateToken = (req: any, res: any, next: any) => {
@@ -62,9 +78,14 @@ const isAdmin = async (req: any, res: any, next: any) => {
 };
 
 // --- API Routes ---
+const apiRouter = express.Router();
+
+apiRouter.get("/health-check", (req, res) => {
+  res.json({ status: "ok", message: "API is alive!" });
+});
 
 // Signup
-app.post("/api/auth/signup", async (req, res) => {
+apiRouter.post("/auth/signup", checkDbConnection, async (req, res) => {
   try {
     const { username, email, password, dob } = req.body;
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -81,18 +102,19 @@ app.post("/api/auth/signup", async (req, res) => {
     await user.save();
 
     const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
-    res.cookie("token", token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie("token", token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
     
     const userResponse: any = user.toObject();
     delete userResponse.password;
     res.status(201).json(userResponse);
-  } catch (error) {
-    res.status(500).json({ message: "Error creating user" });
+  } catch (error: any) {
+    console.error("Signup error:", error);
+    res.status(500).json({ message: "Error creating user: " + error.message });
   }
 });
 
 // Login
-app.post("/api/auth/login", async (req, res) => {
+apiRouter.post("/auth/login", checkDbConnection, async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
@@ -102,24 +124,25 @@ app.post("/api/auth/login", async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
     const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
-    res.cookie("token", token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie("token", token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
 
     const userResponse: any = user.toObject();
     delete userResponse.password;
     res.json(userResponse);
-  } catch (error) {
-    res.status(500).json({ message: "Error logging in" });
+  } catch (error: any) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Error logging in: " + error.message });
   }
 });
 
 // Logout
-app.post("/api/auth/logout", (req, res) => {
+apiRouter.post("/auth/logout", (req, res) => {
   res.clearCookie("token");
   res.json({ message: "Logged out" });
 });
 
 // Get Me
-app.get("/api/auth/me", authenticateToken, async (req: any, res) => {
+apiRouter.get("/auth/me", checkDbConnection, authenticateToken, async (req: any, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -130,7 +153,7 @@ app.get("/api/auth/me", authenticateToken, async (req: any, res) => {
 });
 
 // Update User Data (Favorites/History/Preferences)
-app.put("/api/user/data", authenticateToken, async (req: any, res) => {
+apiRouter.put("/user/data", checkDbConnection, authenticateToken, async (req: any, res) => {
   try {
     const { favorites, history, preferences } = req.body;
     const update: any = {};
@@ -148,9 +171,18 @@ app.put("/api/user/data", authenticateToken, async (req: any, res) => {
 // --- Analytics Routes ---
 
 // Start Session
-app.post("/api/analytics/session/start", async (req, res) => {
+apiRouter.post("/analytics/session/start", checkDbConnection, async (req, res) => {
   try {
     const { visitorId, userId } = req.body;
+    
+    // If we have a userId, try to find an active session for this user and end it
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      await Session.updateMany(
+        { userId, endTime: { $exists: false } },
+        { $set: { endTime: new Date(), duration: 0 } }
+      );
+    }
+
     const sessionData: any = { visitorId };
     if (userId && mongoose.Types.ObjectId.isValid(userId)) {
       sessionData.userId = userId;
@@ -158,13 +190,40 @@ app.post("/api/analytics/session/start", async (req, res) => {
     const session = new Session(sessionData);
     await session.save();
     res.status(201).json({ sessionId: session._id });
+  } catch (error: any) {
+    console.error("Session start error:", error);
+    res.status(500).json({ message: "Error starting session: " + error.message });
+  }
+});
+
+// Heartbeat to keep session alive and track duration
+apiRouter.post("/analytics/session/heartbeat", async (req, res) => {
+  try {
+    const { sessionId, userId } = req.body;
+    const session = await Session.findById(sessionId);
+    if (session) {
+      const now = new Date();
+      const duration = Math.floor((now.getTime() - session.startTime.getTime()) / 1000);
+      session.endTime = now;
+      session.duration = duration;
+      
+      // Update userId if provided and not already set
+      if (userId && !session.userId && mongoose.Types.ObjectId.isValid(userId)) {
+        session.userId = userId;
+      }
+      
+      await session.save();
+      res.json({ message: "Heartbeat received", duration });
+    } else {
+      res.status(404).json({ message: "Session not found" });
+    }
   } catch (error) {
-    res.status(500).json({ message: "Error starting session" });
+    res.status(500).json({ message: "Error updating heartbeat" });
   }
 });
 
 // End Session
-app.post("/api/analytics/session/end", async (req, res) => {
+apiRouter.post("/analytics/session/end", async (req, res) => {
   try {
     const { sessionId } = req.body;
     const session = await Session.findById(sessionId);
@@ -184,13 +243,18 @@ app.post("/api/analytics/session/end", async (req, res) => {
 });
 
 // Get Analytics (Admin Only)
-app.get("/api/analytics", authenticateToken, isAdmin, async (req, res) => {
+apiRouter.get("/analytics", authenticateToken, isAdmin, async (req, res) => {
   try {
     const sessions = await Session.find().sort({ startTime: -1 });
     
     const totalVisits = sessions.length;
-    const uniqueVisitors = new Set(sessions.map(s => s.visitorId)).size;
-    const sessionsWithDuration = sessions.filter(s => s.duration !== undefined);
+    
+    // Unique Visitors: Count unique UserIDs, and unique VisitorIDs that don't have a UserID
+    const userIds = new Set(sessions.filter(s => s.userId).map(s => s.userId.toString()));
+    const visitorIdsWithoutUser = new Set(sessions.filter(s => !s.userId).map(s => s.visitorId));
+    const uniqueVisitors = userIds.size + visitorIdsWithoutUser.size;
+
+    const sessionsWithDuration = sessions.filter(s => s.duration !== undefined && s.duration > 0);
     const totalDuration = sessionsWithDuration.reduce((acc, s) => acc + (s.duration || 0), 0);
     const avgDuration = sessionsWithDuration.length > 0 ? totalDuration / sessionsWithDuration.length : 0;
 
@@ -214,6 +278,14 @@ app.get("/api/analytics", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
+// Catch-all for unhandled API routes
+apiRouter.all("*", (req, res) => {
+  console.log(`Unhandled API request: ${req.method} ${req.url}`);
+  res.status(404).json({ message: `API route not found: ${req.method} ${req.url}` });
+});
+
+app.use("/api", apiRouter);
+
 // Vite Middleware for Development
 async function setupVite() {
   if (process.env.NODE_ENV !== "production") {
@@ -231,8 +303,11 @@ async function setupVite() {
   }
 }
 
-setupVite().then(() => {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+setupVite().catch(err => {
+  console.error("💥 Failed to setup Vite:", err);
 });

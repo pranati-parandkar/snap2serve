@@ -2,69 +2,113 @@ import { Recipe } from "../types";
 
 const API_BASE = "/api";
 
+async function handleResponse(res: Response) {
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    if (res.ok) {
+      throw new Error(`Expected JSON but received: ${text.substring(0, 100)}...`);
+    }
+    throw new Error(`Request failed with status ${res.status}: ${text.substring(0, 100)}...`);
+  }
+
+  if (!res.ok) {
+    throw new Error(data.message || `Request failed with status ${res.status}`);
+  }
+  return data;
+}
+
 export const apiService = {
   async signup(data: any) {
+    console.log(`🚀 Fetching: ${API_BASE}/auth/signup`);
     const res = await fetch(`${API_BASE}/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
+      credentials: 'include'
     });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return handleResponse(res);
   },
 
   async login(data: any) {
+    console.log(`🚀 Fetching: ${API_BASE}/auth/login`);
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
+      credentials: 'include'
     });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return handleResponse(res);
   },
 
   async logout() {
-    const res = await fetch(`${API_BASE}/auth/logout`, { method: "POST" });
-    return res.json();
+    console.log(`🚀 Fetching: ${API_BASE}/auth/logout`);
+    const res = await fetch(`${API_BASE}/auth/logout`, { 
+      method: "POST",
+      credentials: 'include'
+    });
+    return handleResponse(res);
   },
 
   async getMe() {
-    const res = await fetch(`${API_BASE}/auth/me`);
-    if (!res.ok) return null;
-    return res.json();
+    console.log(`🚀 Fetching: ${API_BASE}/auth/me`);
+    const res = await fetch(`${API_BASE}/auth/me`, {
+      credentials: 'include'
+    });
+    if (res.status === 401) return null;
+    return handleResponse(res);
   },
 
   async updateUserData(data: { favorites?: Recipe[]; history?: Recipe[]; preferences?: any }) {
+    console.log(`🚀 Fetching: ${API_BASE}/user/data`);
     const res = await fetch(`${API_BASE}/user/data`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
+      credentials: 'include'
     });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return handleResponse(res);
   },
 
   async startSession(visitorId: string, userId?: string) {
+    console.log(`🚀 Fetching: ${API_BASE}/analytics/session/start`);
     const res = await fetch(`${API_BASE}/analytics/session/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ visitorId, userId }),
+      credentials: 'include'
     });
-    return res.json();
+    return handleResponse(res);
+  },
+
+  async heartbeat(sessionId: string, userId?: string) {
+    const res = await fetch(`${API_BASE}/analytics/session/heartbeat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, userId }),
+      credentials: 'include'
+    });
+    return handleResponse(res);
   },
 
   async endSession(sessionId: string) {
+    console.log(`🚀 Fetching: ${API_BASE}/analytics/session/end`);
     const res = await fetch(`${API_BASE}/analytics/session/end`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId }),
+      credentials: 'include'
     });
-    return res.json();
+    return handleResponse(res).catch(() => ({}));
   },
 
   async getAnalytics() {
-    const res = await fetch(`${API_BASE}/analytics`);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    console.log(`🚀 Fetching: ${API_BASE}/analytics`);
+    const res = await fetch(`${API_BASE}/analytics`, {
+      credentials: 'include'
+    });
+    return handleResponse(res);
   }
 };
