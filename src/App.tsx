@@ -81,7 +81,7 @@ import { detectIngredients, generateRecipes, generateSpeech, getSmartRecommendat
 import { fetchRecipeImage } from './services/pixabayService';
 import { ChatBot } from './components/ChatBot';
 import { cn } from './lib/utils';
-import { apiService } from './services/apiService';
+import { apiService } from './services/apiservice';
 
 function pcmToWav(pcmBase64: string, sampleRate: number = 24000): string {
   const pcmData = Uint8Array.from(atob(pcmBase64), c => c.charCodeAt(0));

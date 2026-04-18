@@ -7,7 +7,7 @@ import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import cookieParser from "cookie-parser";
-import { User, Session } from "./models/Models";
+import { User, Session } from "./models/Models.ts"; 
 
 dotenv.config();
 
@@ -245,7 +245,7 @@ apiRouter.post("/analytics/session/end", async (req, res) => {
 // Get Analytics (Admin Only)
 apiRouter.get("/analytics", authenticateToken, isAdmin, async (req, res) => {
   try {
-    const sessions = await Session.find().sort({ startTime: -1 });
+    const sessions: any[] = await Session.find();
     
     const totalVisits = sessions.length;
     
