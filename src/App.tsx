@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { 
   LineChart, 
   Line, 
@@ -81,7 +83,7 @@ import { detectIngredients, generateRecipes, generateSpeech, getSmartRecommendat
 import { fetchRecipeImage } from './services/pixabayService';
 import { ChatBot } from './components/ChatBot';
 import { cn } from './lib/utils';
-import { apiService } from './services/apiservice';
+import { apiService } from './services/apiService';
 
 function pcmToWav(pcmBase64: string, sampleRate: number = 24000): string {
   const pcmData = Uint8Array.from(atob(pcmBase64), c => c.charCodeAt(0));
@@ -198,6 +200,7 @@ export default function App() {
     ];
   };
   const [rating, setRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState("");
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [newIngredient, setNewIngredient] = useState('');
   const [showAddInput, setShowAddInput] = useState(false);
@@ -519,29 +522,36 @@ export default function App() {
     }
   }, [detectedIngredients]);
 
-  const toggleFavorite = async (recipe: Recipe) => {
+   const toggleFavorite = async (recipe: Recipe) => {
     if (!recipe || !recipe.id) return;
     if (!user) {
-      alert("Please login to save favorites! 💖");
+      toast.warn("Please login to save favorites! 💖");
       setIsLoginOpen(true);
       return;
     }
 
     try {
       const isFavorite = favorites.some(f => f.id === recipe.id);
-      const updatedFavorites = isFavorite 
-        ? favorites.filter(f => f.id !== recipe.id)
-        : [...favorites, recipe];
-      
-      setFavorites(updatedFavorites);
-      await apiService.updateUserData({ favorites: updatedFavorites });
+      if (isFavorite) {
+        const updatedFavorites = favorites.filter(f => f.id !== recipe.id);
+        setFavorites(updatedFavorites);
+        await apiService.updateUserData({ favorites: updatedFavorites });
+        toast.info("Removed from favorites");
+      } else {
+        const updatedFavorites = [...favorites, recipe];
+        setFavorites(updatedFavorites);
+        await apiService.updateUserData({ favorites: updatedFavorites });
+        toast.success("Added to favorites");
+      }
     } catch (error) {
+      toast.error("Failed to update favorites");
       console.error("Failed to update favorites", error);
     }
   };
 
-  const addToHistory = async (recipe: Recipe) => {
-    const updatedHistory = [recipe, ...history.filter(r => r.id !== recipe.id)].slice(0, 50);
+  const addToHistory = async (recipe: Recipe, rating?: number, comment?: string) => {
+    const historyItem = { ...recipe, rating, comment, ratedAt: new Date().toISOString() };
+    const updatedHistory = [historyItem, ...history.filter(r => r.id !== recipe.id)].slice(0, 50);
     setHistory(updatedHistory);
 
     if (!user) {
@@ -1169,22 +1179,15 @@ export default function App() {
               </button>
 
               <button 
-  onClick={() => {
-    const event = new CustomEvent('open-chatbot', { 
-      detail: `I have a question about the ${selectedRecipe.title} recipe.` 
-    });
-    window.dispatchEvent(event);
-  }}
-  className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl flex items-center justify-between px-6 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
->
-  {/* Left side - Bot icon */}
-  <Bot className="w-7 h-7" />
-
-  {/* Right side - Text */}
-  <span className="flex-1 text-right pr-2">
-    Ask AI about this recipe
-  </span>
-</button>
+                onClick={() => {
+                  const event = new CustomEvent('open-chatbot', { detail: `I have a question about the ${selectedRecipe.title} recipe.` });
+                  window.dispatchEvent(event);
+                }}
+                className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex items-center justify-center hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
+              >
+                <Bot className="absolute left-[15%] w-7 h-7" />
+                <span>Ask AI about this recipe</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1309,7 +1312,7 @@ export default function App() {
                 <h2 className="text-4xl font-display text-brand-950 mb-4">Yum! How was it?</h2>
                 <p className="text-brand-500 font-medium mb-10">Rate your masterpiece! 👩‍🍳</p>
                 
-                <div className="flex justify-center gap-3 mb-12">
+                <div className="flex justify-center gap-3 mb-8">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <button
                       key={s}
@@ -1326,14 +1329,40 @@ export default function App() {
                   ))}
                 </div>
 
+                <textarea
+                  value={feedbackComment}
+                  onChange={(e) => setFeedbackComment(e.target.value)}
+                  placeholder="Tell us what you liked or how we can improve... (optional)"
+                  className="w-full p-6 rounded-3xl bg-brand-50 border-4 border-transparent focus:border-cute-pink/20 focus:bg-white outline-none transition-all resize-none h-32 mb-8 font-medium text-brand-900 placeholder:text-brand-300"
+                />
+
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (selectedRecipe) {
-                      addToHistory(selectedRecipe);
+                      addToHistory(selectedRecipe, rating, feedbackComment);
                     }
+                    
+                    // Submit feedback to backend
+                    try {
+                      const visitorId = localStorage.getItem('snap2serve_visitor_id');
+                      if (visitorId && rating > 0) {
+                        await apiService.submitFeedback({
+                          rating,
+                          comment: feedbackComment,
+                          userId: user?.id,
+                          visitorId,
+                          recipeId: selectedRecipe.id,
+                          recipeTitle: selectedRecipe.title
+                        });
+                      }
+                    } catch (error) {
+                      console.error("Failed to submit feedback", error);
+                    }
+
                     alert(`Thanks for the ${rating} star rating! 💖`);
                     setShowRating(false);
                     setRating(0);
+                    setFeedbackComment("");
                     setStep('detail');
                   }}
                   className="w-full bg-cute-pink text-white py-5 rounded-3xl font-bold text-xl shadow-lg shadow-cute-pink/20 hover:scale-[1.02] transition-all"
@@ -2243,6 +2272,47 @@ export default function App() {
         </div>
       </div>
 
+      <div className="mt-12 bg-white p-10 rounded-[3rem] border-4 border-cute-pink/20 shadow-xl">
+        <h3 className="text-2xl font-display mb-8 text-cute-pink flex items-center gap-2">
+          <Star className="w-6 h-6 fill-cute-pink" />
+          Recent Feedback
+        </h3>
+        <div className="space-y-6">
+          {analyticsData?.recentFeedback && analyticsData.recentFeedback.length > 0 ? (
+            analyticsData.recentFeedback.map((fb: any, idx: number) => (
+              <div key={idx} className="p-6 rounded-3xl bg-brand-50/50 border-2 border-brand-100">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <div className="flex gap-1 mb-2">
+                      {[...Array(5)].map((_, i) => (
+                        <Star 
+                          key={i} 
+                          className={cn(
+                            "w-4 h-4",
+                            i < fb.rating ? "text-cute-yellow fill-cute-yellow" : "text-brand-200"
+                          )} 
+                        />
+                      ))}
+                    </div>
+                    <p className="font-bold text-brand-900">{fb.recipeTitle || 'Unknown Recipe'}</p>
+                    <p className="text-xs text-brand-500">
+                      {fb.userId?.username || 'Guest'} • {new Date(fb.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                {fb.comment && (
+                  <p className="text-brand-700 text-sm italic bg-white p-4 rounded-2xl border border-brand-100">
+                    "{fb.comment}"
+                  </p>
+                )}
+              </div>
+            ))
+          ) : (
+            <p className="text-center text-brand-500 py-8 italic">No feedback yet! 👩‍🍳</p>
+          )}
+        </div>
+      </div>
+
       <div className="mt-12 bg-white p-10 rounded-[3rem] border-4 border-cute-mint/20 shadow-sm">
         <h3 className="text-2xl font-display mb-6 text-cute-mint flex items-center gap-2">
           <BarChart3 className="w-6 h-6" />
@@ -2485,6 +2555,18 @@ export default function App() {
       </footer>
       <ChatBot currentRecipe={selectedRecipe} />
       {renderRecommendationModal()}
+      <ToastContainer 
+        position="bottom-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 }
