@@ -110,5 +110,16 @@ export const apiService = {
       credentials: 'include'
     });
     return handleResponse(res);
+  },
+
+  async submitFeedback(data: { rating: number, userId?: string, visitorId: string, comment?: string, recipeId?: string, recipeTitle?: string }) {
+    console.log(`🚀 Fetching: ${API_BASE}/feedback`);
+    const res = await fetch(`${API_BASE}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+      credentials: 'include'
+    });
+    return handleResponse(res);
   }
 };

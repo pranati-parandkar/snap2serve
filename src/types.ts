@@ -38,11 +38,22 @@ export interface Session {
   duration?: number;
 }
 
+export interface Feedback {
+  userId?: { username: string; email: string };
+  visitorId: string;
+  recipeId?: string;
+  recipeTitle?: string;
+  rating: number;
+  comment?: string;
+  createdAt: string;
+}
+
 export interface AnalyticsData {
   totalVisitors: number;
   totalVisits: number;
   avgTimeSpent: number; // in seconds
   visitsPerDay: { date: string; count: number }[];
+  recentFeedback?: Feedback[];
 }
 
 export interface RecommendationResult {

@@ -24,3 +24,15 @@ const sessionSchema = new mongoose.Schema({
 });
 
 export const Session = mongoose.model('Session', sessionSchema);
+
+const feedbackSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  visitorId: { type: String, required: true },
+  recipeId: { type: String },
+  recipeTitle: { type: String },
+  rating: { type: Number, required: true, min: 1, max: 5 },
+  comment: { type: String },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export const Feedback = mongoose.model('Feedback', feedbackSchema);

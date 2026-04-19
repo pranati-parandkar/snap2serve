@@ -78,12 +78,12 @@ import {
   Cake,
   TrendingUp
 } from 'lucide-react';
-import { Recipe, Ingredient, UserPreferences, Session, AnalyticsData, RecommendationResult } from './types';
+import { Recipe, Ingredient, UserPreferences, Session, AnalyticsData, RecommendationResult, Feedback } from './types';
 import { detectIngredients, generateRecipes, generateSpeech, getSmartRecommendation, generateFoodOptions } from './services/geminiService';
 import { fetchRecipeImage } from './services/pixabayService';
 import { ChatBot } from './components/ChatBot';
 import { cn } from './lib/utils';
-import { apiService } from './services/apiService';
+import { apiService } from './services/apiservice';
 
 function pcmToWav(pcmBase64: string, sampleRate: number = 24000): string {
   const pcmData = Uint8Array.from(atob(pcmBase64), c => c.charCodeAt(0));
@@ -888,17 +888,35 @@ export default function App() {
             <div className="space-y-6">
               <div>
                 <label className="text-sm font-bold text-brand-500 mb-2 block">How much time?</label>
-                <div className="flex items-center gap-4">
-                  <input 
-                    type="range" 
-                    min="10" 
-                    max="120" 
-                    step="5"
-                    value={preferences.maxTime}
-                    onChange={(e) => setPreferences({...preferences, maxTime: parseInt(e.target.value)})}
-                    className="flex-1 accent-cute-pink h-2 bg-brand-100 rounded-full appearance-none cursor-pointer"
-                  />
-                  <span className="font-display text-2xl min-w-[70px] text-cute-pink">{preferences.maxTime}m</span>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-4">
+                    <input 
+                      type="range" 
+                      min="10" 
+                      max="120" 
+                      step="5"
+                      value={preferences.maxTime}
+                      onChange={(e) => setPreferences({...preferences, maxTime: parseInt(e.target.value)})}
+                      className="flex-1 accent-cute-pink h-2 bg-brand-100 rounded-full appearance-none cursor-pointer"
+                    />
+                    <span className="font-display text-2xl min-w-[70px] text-cute-pink">{preferences.maxTime}m</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[15, 30, 45, 60, 90, 120].map(time => (
+                      <button
+                        key={time}
+                        onClick={() => setPreferences({...preferences, maxTime: time})}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-xs font-bold transition-all border-2",
+                          preferences.maxTime === time 
+                            ? "bg-cute-pink text-white border-cute-pink shadow-md scale-105" 
+                            : "bg-white text-brand-400 border-brand-100 hover:border-cute-pink/30 hover:text-cute-pink"
+                        )}
+                      >
+                        {time}m
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
               
@@ -1893,17 +1911,35 @@ export default function App() {
 
             <div>
               <label className="text-sm font-bold text-brand-500 mb-3 block">Available Time? ⏱️</label>
-              <div className="flex items-center gap-4">
-                <input 
-                  type="range" 
-                  min="5" 
-                  max="120" 
-                  step="5"
-                  value={smartSuggestionsForm.time}
-                  onChange={(e) => setSmartSuggestionsForm({...smartSuggestionsForm, time: parseInt(e.target.value)})}
-                  className="flex-1 accent-cute-pink h-2 bg-brand-100 rounded-full appearance-none cursor-pointer"
-                />
-                <span className="font-display text-2xl min-w-[70px] text-cute-pink">{smartSuggestionsForm.time}m</span>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-4">
+                  <input 
+                    type="range" 
+                    min="5" 
+                    max="120" 
+                    step="5"
+                    value={smartSuggestionsForm.time}
+                    onChange={(e) => setSmartSuggestionsForm({...smartSuggestionsForm, time: parseInt(e.target.value)})}
+                    className="flex-1 accent-cute-pink h-2 bg-brand-100 rounded-full appearance-none cursor-pointer"
+                  />
+                  <span className="font-display text-2xl min-w-[70px] text-cute-pink">{smartSuggestionsForm.time}m</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[15, 30, 45, 60, 90, 120].map(time => (
+                    <button
+                      key={time}
+                      onClick={() => setSmartSuggestionsForm({...smartSuggestionsForm, time})}
+                      className={cn(
+                        "px-4 py-2 rounded-xl text-xs font-bold transition-all border-2",
+                        smartSuggestionsForm.time === time 
+                          ? "bg-cute-pink text-white border-cute-pink shadow-md scale-105" 
+                          : "bg-white text-brand-400 border-brand-100 hover:border-cute-pink/30 hover:text-cute-pink"
+                      )}
+                    >
+                      {time} m
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -2279,17 +2315,17 @@ export default function App() {
         </h3>
         <div className="space-y-6">
           {analyticsData?.recentFeedback && analyticsData.recentFeedback.length > 0 ? (
-            analyticsData.recentFeedback.map((fb: any, idx: number) => (
+            analyticsData.recentFeedback.map((fb: Feedback, idx: number) => (
               <div key={idx} className="p-6 rounded-3xl bg-brand-50/50 border-2 border-brand-100">
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <div className="flex gap-1 mb-2">
-                      {[...Array(5)].map((_, i) => (
+                      {[1, 2, 3, 4, 5].map((star) => (
                         <Star 
-                          key={i} 
+                          key={star} 
                           className={cn(
                             "w-4 h-4",
-                            i < fb.rating ? "text-cute-yellow fill-cute-yellow" : "text-brand-200"
+                            star <= (fb.rating || 0) ? "text-cute-yellow fill-cute-yellow" : "text-brand-200"
                           )} 
                         />
                       ))}

@@ -7,7 +7,7 @@ import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import cookieParser from "cookie-parser";
-import { User, Session } from "./models/Models.ts"; 
+import { User, Session, Feedback } from "./models/Models";
 
 dotenv.config();
 
@@ -16,6 +16,8 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3000;
+
+const apiRouter = express.Router();
 
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -38,6 +40,10 @@ if (MONGODB_URI) {
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cookieParser());
+
+app.get("/api/test", (req, res) => {
+  res.json({ message: "API is working directly on app" });
+});
 
 // Database Connection Check Middleware
 const checkDbConnection = (req: any, res: any, next: any) => {
@@ -78,7 +84,6 @@ const isAdmin = async (req: any, res: any, next: any) => {
 };
 
 // --- API Routes ---
-const apiRouter = express.Router();
 
 apiRouter.get("/health-check", (req, res) => {
   res.json({ status: "ok", message: "API is alive!" });
@@ -165,6 +170,30 @@ apiRouter.put("/user/data", checkDbConnection, authenticateToken, async (req: an
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: "Error updating user data" });
+  }
+});
+
+// Feedback
+apiRouter.post("/feedback", checkDbConnection, async (req, res) => {
+  try {
+    const { rating, userId, visitorId, comment, recipeId, recipeTitle } = req.body;
+    console.log(`[FEEDBACK] Received: rating=${rating}, userId=${userId}, recipe=${recipeTitle}`);
+    
+    const feedback = new Feedback({
+      rating,
+      comment,
+      recipeId,
+      recipeTitle,
+      userId: userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null,
+      visitorId
+    });
+    
+    await feedback.save();
+    console.log(`[FEEDBACK] Saved successfully: ${feedback._id}`);
+    res.status(201).json({ message: "Feedback saved successfully", id: feedback._id });
+  } catch (error: any) {
+    console.error("[FEEDBACK] Error saving feedback:", error);
+    res.status(500).json({ message: "Error saving feedback: " + error.message });
   }
 });
 
@@ -267,11 +296,17 @@ apiRouter.get("/analytics", authenticateToken, isAdmin, async (req, res) => {
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    const recentFeedback = await Feedback.find()
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate('userId', 'username email');
+
     res.json({
       totalVisitors: uniqueVisitors,
       totalVisits: totalVisits,
       avgTimeSpent: avgDuration,
-      visitsPerDay
+      visitsPerDay,
+      recentFeedback
     });
   } catch (error) {
     res.status(500).json({ message: "Error fetching analytics" });
@@ -280,14 +315,19 @@ apiRouter.get("/analytics", authenticateToken, isAdmin, async (req, res) => {
 
 // Catch-all for unhandled API routes
 apiRouter.all("*", (req, res) => {
-  console.log(`Unhandled API request: ${req.method} ${req.url}`);
-  res.status(404).json({ message: `API route not found: ${req.method} ${req.url}` });
+  console.log(`[API DEBUG] Unhandled API request: ${req.method} ${req.url}`);
+  console.log(`[API DEBUG] Full path: ${req.baseUrl}${req.url}`);
+  res.status(404).json({ 
+    message: `API route not found: ${req.method} ${req.url}`,
+    baseUrl: req.baseUrl,
+    path: req.url
+  });
 });
 
 app.use("/api", apiRouter);
 
-// Vite Middleware for Development
-async function setupVite() {
+async function startServer() {
+  // Vite Middleware for Development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -301,13 +341,13 @@ async function setupVite() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
 }
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
-
-setupVite().catch(err => {
-  console.error("💥 Failed to setup Vite:", err);
+startServer().catch(err => {
+  console.error("💥 Failed to start server:", err);
 });
