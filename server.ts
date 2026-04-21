@@ -334,7 +334,7 @@ apiRouter.post("/analytics/session/end", async (req, res) => {
 // Get Analytics (Admin Only)
 apiRouter.get("/analytics", authenticateToken, isAdmin, async (req, res) => {
   try {
-    const sessions = await Session.find().sort({ startTime: -1 });
+    const sessions: any[] = await Session.find();
     
     const totalVisits = sessions.length;
     
