@@ -19,7 +19,7 @@
 
   --color-cute-pink: #ff8a8a;
   --color-cute-mint: #a1eebd;
-  --color-cute-yellow: #f6f7c4;
+  --color-cute-yellow: #facc15;
   --color-cute-blue: #7bd3ea;
 }
 
@@ -56,20 +56,20 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #ffc985;
+  background: #ff8c1a;
   border-radius: 20px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #ff8c1a;
+  background: #cc6600;
   background-clip: content-box;
 }
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #ffc985 transparent;
+  scrollbar-color: #ff8c1a transparent;
 }
 
 /* Recipe Card Hover Effect */
@@ -80,5 +80,4 @@
 .recipe-card:hover {
   transform: translateY(-12px) scale(1.02);
   box-shadow: 0 25px 50px -12px rgba(255, 138, 138, 0.25);
-  background-color: #fff1db; /* soft light orange/cream */
 }

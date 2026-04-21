@@ -48,6 +48,19 @@ export interface Feedback {
   createdAt: string;
 }
 
+export interface GroupedFeedback {
+  recipeId?: string;
+  recipeTitle: string;
+  averageRating: number;
+  totalReviews: number;
+  items: {
+    comment?: string;
+    rating: number;
+    username: string;
+    createdAt: string;
+  }[];
+}
+
 export interface AnalyticsData {
   totalVisitors: number;
   totalVisits: number;

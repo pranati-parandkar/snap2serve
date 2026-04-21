@@ -1,4 +1,4 @@
-import { Recipe } from "../types";
+import { Recipe, Feedback, GroupedFeedback, AnalyticsData } from "../types";
 
 const API_BASE = "/api";
 
@@ -21,7 +21,7 @@ async function handleResponse(res: Response) {
 }
 
 export const apiService = {
-  async signup(data: any) {
+  async signup(data: any): Promise<any> {
     console.log(`🚀 Fetching: ${API_BASE}/auth/signup`);
     const res = await fetch(`${API_BASE}/auth/signup`, {
       method: "POST",
@@ -32,7 +32,7 @@ export const apiService = {
     return handleResponse(res);
   },
 
-  async login(data: any) {
+  async login(data: any): Promise<any> {
     console.log(`🚀 Fetching: ${API_BASE}/auth/login`);
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
@@ -43,7 +43,7 @@ export const apiService = {
     return handleResponse(res);
   },
 
-  async logout() {
+  async logout(): Promise<any> {
     console.log(`🚀 Fetching: ${API_BASE}/auth/logout`);
     const res = await fetch(`${API_BASE}/auth/logout`, { 
       method: "POST",
@@ -52,7 +52,7 @@ export const apiService = {
     return handleResponse(res);
   },
 
-  async getMe() {
+  async getMe(): Promise<any> {
     console.log(`🚀 Fetching: ${API_BASE}/auth/me`);
     const res = await fetch(`${API_BASE}/auth/me`, {
       credentials: 'include'
@@ -61,7 +61,7 @@ export const apiService = {
     return handleResponse(res);
   },
 
-  async updateUserData(data: { favorites?: Recipe[]; history?: Recipe[]; preferences?: any }) {
+  async updateUserData(data: { favorites?: Recipe[]; history?: Recipe[]; preferences?: any }): Promise<any> {
     console.log(`🚀 Fetching: ${API_BASE}/user/data`);
     const res = await fetch(`${API_BASE}/user/data`, {
       method: "PUT",
@@ -72,7 +72,7 @@ export const apiService = {
     return handleResponse(res);
   },
 
-  async startSession(visitorId: string, userId?: string) {
+  async startSession(visitorId: string, userId?: string): Promise<any> {
     console.log(`🚀 Fetching: ${API_BASE}/analytics/session/start`);
     const res = await fetch(`${API_BASE}/analytics/session/start`, {
       method: "POST",
@@ -83,7 +83,7 @@ export const apiService = {
     return handleResponse(res);
   },
 
-  async heartbeat(sessionId: string, userId?: string) {
+  async heartbeat(sessionId: string, userId?: string): Promise<any> {
     const res = await fetch(`${API_BASE}/analytics/session/heartbeat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -93,7 +93,7 @@ export const apiService = {
     return handleResponse(res);
   },
 
-  async endSession(sessionId: string) {
+  async endSession(sessionId: string): Promise<any> {
     console.log(`🚀 Fetching: ${API_BASE}/analytics/session/end`);
     const res = await fetch(`${API_BASE}/analytics/session/end`, {
       method: "POST",
@@ -104,7 +104,7 @@ export const apiService = {
     return handleResponse(res).catch(() => ({}));
   },
 
-  async getAnalytics() {
+  async getAnalytics(): Promise<AnalyticsData> {
     console.log(`🚀 Fetching: ${API_BASE}/analytics`);
     const res = await fetch(`${API_BASE}/analytics`, {
       credentials: 'include'
@@ -112,7 +112,7 @@ export const apiService = {
     return handleResponse(res);
   },
 
-  async submitFeedback(data: { rating: number, userId?: string, visitorId: string, comment?: string, recipeId?: string, recipeTitle?: string }) {
+  async submitFeedback(data: { rating: number, userId?: string, visitorId: string, comment?: string, recipeId?: string, recipeTitle?: string }): Promise<any> {
     console.log(`🚀 Fetching: ${API_BASE}/feedback`);
     const res = await fetch(`${API_BASE}/feedback`, {
       method: "POST",
@@ -120,6 +120,12 @@ export const apiService = {
       body: JSON.stringify(data),
       credentials: 'include'
     });
+    return handleResponse(res);
+  },
+
+  async getCommunityFeedback(): Promise<GroupedFeedback[]> {
+    console.log(`🚀 Fetching: ${API_BASE}/community-feedback`);
+    const res = await fetch(`${API_BASE}/community-feedback`);
     return handleResponse(res);
   }
 };

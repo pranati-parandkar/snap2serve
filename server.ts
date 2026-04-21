@@ -15,7 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 const apiRouter = express.Router();
 
@@ -40,6 +40,18 @@ if (MONGODB_URI) {
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cookieParser());
+
+// Mount API routes BEFORE any static or SPA fallback handlers
+console.log("Mounting /api routes...");
+app.use("/api", (req, res, next) => {
+  // Simple logger for API calls
+  console.log(`[API REQUEST] ${req.method} ${req.url}`);
+  next();
+}, apiRouter);
+
+app.get("/api/ping", (req, res) => {
+  res.json({ message: "pong", time: new Date().toISOString() });
+});
 
 app.get("/api/test", (req, res) => {
   res.json({ message: "API is working directly on app" });
@@ -197,6 +209,54 @@ apiRouter.post("/feedback", checkDbConnection, async (req, res) => {
   }
 });
 
+// Community Feedback (Public)
+apiRouter.get("/community-feedback", checkDbConnection, async (req, res) => {
+  try {
+    const feedbacks = await Feedback.find()
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .populate('userId', 'username');
+    
+    const grouped: Record<string, any> = {};
+    
+    feedbacks.forEach((fb: any) => {
+      const key = fb.recipeId || fb.recipeTitle || 'Unknown';
+      if (!grouped[key]) {
+        grouped[key] = {
+          recipeId: fb.recipeId,
+          recipeTitle: fb.recipeTitle || 'Unknown Recipe',
+          ratings: [],
+          allFeedbacks: []
+        };
+      }
+      
+      grouped[key].ratings.push(fb.rating);
+      grouped[key].allFeedbacks.push({
+        comment: fb.comment,
+        rating: fb.rating,
+        username: fb.userId?.username || 'Guest Chef',
+        createdAt: fb.createdAt
+      });
+    });
+
+    const result = Object.values(grouped).map((item: any) => {
+      const sum = item.ratings.reduce((a: number, b: number) => a + b, 0);
+      return {
+        recipeId: item.recipeId,
+        recipeTitle: item.recipeTitle,
+        averageRating: sum / item.ratings.length,
+        totalReviews: item.ratings.length,
+        items: item.allFeedbacks.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      };
+    }).sort((a: any, b: any) => b.averageRating - a.averageRating).slice(0, 50);
+
+    res.json(result);
+  } catch (error) {
+    console.error("Community feedback error:", error);
+    res.status(500).json({ message: "Error fetching community feedback" });
+  }
+});
+
 // --- Analytics Routes ---
 
 // Start Session
@@ -274,7 +334,7 @@ apiRouter.post("/analytics/session/end", async (req, res) => {
 // Get Analytics (Admin Only)
 apiRouter.get("/analytics", authenticateToken, isAdmin, async (req, res) => {
   try {
-    const sessions: any[] = await Session.find();
+    const sessions = await Session.find().sort({ startTime: -1 });
     
     const totalVisits = sessions.length;
     
@@ -324,8 +384,6 @@ apiRouter.all("*", (req, res) => {
   });
 });
 
-app.use("/api", apiRouter);
-
 async function startServer() {
   // Vite Middleware for Development
   if (process.env.NODE_ENV !== "production") {
@@ -342,9 +400,21 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ Error: Port ${PORT} is already in use.`);
+      console.error(`💡 Tip: Another application is already running on this port.`);
+      console.error(`👉 You can stop the other app, or run this one on a different port like this:`);
+      console.error(`   PORT=${PORT + 1} npm run dev\n`);
+      process.exit(1);
+    } else {
+      console.error("💥 Server error:", err);
+    }
   });
 }
 

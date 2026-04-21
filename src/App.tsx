@@ -78,7 +78,7 @@ import {
   Cake,
   TrendingUp
 } from 'lucide-react';
-import { Recipe, Ingredient, UserPreferences, Session, AnalyticsData, RecommendationResult, Feedback } from './types';
+import { Recipe, Ingredient, UserPreferences, Session, AnalyticsData, RecommendationResult, Feedback, GroupedFeedback } from './types';
 import { detectIngredients, generateRecipes, generateSpeech, getSmartRecommendation, generateFoodOptions } from './services/geminiService';
 import { fetchRecipeImage } from './services/pixabayService';
 import { ChatBot } from './components/ChatBot';
@@ -122,7 +122,7 @@ function pcmToWav(pcmBase64: string, sampleRate: number = 24000): string {
 }
 
 export default function App() {
-  const [step, setStep] = useState<'home' | 'detecting' | 'ingredients' | 'recipes' | 'detail' | 'history' | 'cooking' | 'favorites' | 'explore' | 'analytics' | 'smart-suggestions'>('home');
+  const [step, setStep] = useState<'home' | 'detecting' | 'ingredients' | 'recipes' | 'detail' | 'history' | 'cooking' | 'favorites' | 'explore' | 'analytics' | 'smart-suggestions' | 'community'>('home');
   const [previousStep, setPreviousStep] = useState<string | null>(null);
 
   const navigateTo = (newStep: any) => {
@@ -143,6 +143,8 @@ export default function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [showRating, setShowRating] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [communityFeedback, setCommunityFeedback] = useState<GroupedFeedback[]>([]);
+  const [isCommunityLoading, setIsCommunityLoading] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [exploreRecipes, setExploreRecipes] = useState<Recipe[]>([]);
@@ -386,6 +388,20 @@ export default function App() {
 
   const [favorites, setFavorites] = useState<Recipe[]>([]);
   const [history, setHistory] = useState<Recipe[]>([]);
+
+  const handleViewRecipeFromFeedback = (recipeId?: string, title?: string) => {
+    // Search in all current data sources
+    const allAvailable = [...exploreRecipes, ...smartOptions, ...history, ...favorites];
+    const found = allAvailable.find(r => (recipeId && r.id === recipeId) || (title && r.title === title));
+
+    if (found) {
+      setSelectedRecipe(found);
+      setStep('detail');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      toast.info("Recipe details aren't in view right now. You can find it in Explore! 🍳");
+    }
+  };
   const [isSpeaking, setIsSpeaking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -563,6 +579,19 @@ export default function App() {
       await apiService.updateUserData({ history: updatedHistory });
     } catch (error) {
       console.error("Failed to update history", error);
+    }
+  };
+
+  const fetchCommunityFeedback = async () => {
+    setIsCommunityLoading(true);
+    try {
+      const data = await apiService.getCommunityFeedback();
+      setCommunityFeedback(data);
+    } catch (err) {
+      console.error("Failed to fetch community feedback:", err);
+      toast.error("Could not load community feedback 🌍");
+    } finally {
+      setIsCommunityLoading(false);
     }
   };
 
@@ -1201,7 +1230,7 @@ export default function App() {
                   const event = new CustomEvent('open-chatbot', { detail: `I have a question about the ${selectedRecipe.title} recipe.` });
                   window.dispatchEvent(event);
                 }}
-                className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex items-center justify-center hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
+                className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex flex-col items-center justify-center hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
               >
                 <Bot className="absolute left-[15%] w-7 h-7" />
                 <span>Ask AI about this recipe</span>
@@ -1340,7 +1369,7 @@ export default function App() {
                       <Star 
                         className={cn(
                           "w-12 h-12 transition-colors",
-                          rating >= s ? "text-cute-yellow fill-cute-yellow" : "text-brand-100"
+                          rating >= s ? "text-cute-yellow fill-cute-yellow" : "text-brand-300"
                         )} 
                       />
                     </button>
@@ -1894,7 +1923,7 @@ export default function App() {
         <div className="bg-white p-10 rounded-[3rem] shadow-xl border-8 border-cute-yellow/10 space-y-10">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <label className="text-sm font-bold text-brand-500 mb-3 block">Budget (₹)? 💸</label>
+              <label className="text-lg font-display text-brand-950 mb-3 block">Budget (₹)? 💸</label>
               <div className="flex items-center gap-4">
                 <input 
                   type="range" 
@@ -2199,17 +2228,138 @@ export default function App() {
     </motion.div>
   );
 
+  const renderCommunityFeedback = () => (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-4xl mx-auto px-4 py-12"
+    >
+      <div className="flex items-center justify-between mb-12">
+        <div className="flex items-center gap-4">
+          <button onClick={() => setStep('home')} className="p-3 bg-white hover:bg-cute-pink/10 rounded-2xl transition-colors shadow-sm">
+            <ArrowLeft className="w-6 h-6 text-cute-pink" />
+          </button>
+          <div>
+            <h2 className="text-3xl font-display text-cute-pink">Community Feedback 🌍</h2>
+            <p className="text-brand-500 font-medium">Hear what other chefs are saying!</p>
+          </div>
+        </div>
+        <button 
+          onClick={fetchCommunityFeedback}
+          className="p-3 bg-cute-pink/10 hover:bg-cute-pink/20 rounded-2xl transition-colors text-cute-pink"
+          title="Refresh Feed"
+        >
+          <TrendingUp className="w-6 h-6" />
+        </button>
+      </div>
+
+      {isCommunityLoading ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="w-12 h-12 animate-spin text-cute-pink mb-4" />
+          <p className="text-brand-500 font-display animate-pulse text-lg">Loading community stories...</p>
+        </div>
+      ) : communityFeedback.length > 0 ? (
+        <div className="grid grid-cols-1 gap-8">
+          {communityFeedback.map((group, idx) => (
+            <motion.div 
+              key={idx}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.1 }}
+              className="bg-white rounded-[3rem] border-4 border-brand-100 shadow-xl overflow-hidden hover:border-cute-pink/30 transition-all group"
+            >
+              <div className="p-6 border-b-4 border-brand-50 bg-brand-50/30">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div 
+                    className="cursor-pointer group/title"
+                    onClick={() => handleViewRecipeFromFeedback(group.recipeId, group.recipeTitle)}
+                  >
+                    <h3 className="text-xl font-display text-brand-950 mb-2 group-hover/title:text-cute-pink transition-colors flex items-center gap-2">
+                      {group.recipeTitle}
+                      <ArrowLeft className="w-4 h-4 rotate-180 opacity-0 group-hover/title:opacity-100 transition-all translate-x-[-10px] group-hover/title:translate-x-0" />
+                    </h3>
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star 
+                            key={star} 
+                            className={cn(
+                              "w-5 h-5",
+                              star <= Math.round(group.averageRating) ? "text-cute-yellow fill-cute-yellow" : "text-brand-300"
+                            )} 
+                          />
+                        ))}
+                      </div>
+                      <span className="font-bold text-brand-600 bg-white px-3 py-1 rounded-full border border-brand-100 text-sm">
+                        {group.averageRating.toFixed(1)} • {group.totalReviews} {group.totalReviews === 1 ? 'Review' : 'Reviews'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-14 h-14 bg-cute-pink rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:rotate-12 transition-transform">
+                    <UtensilsCrossed className="w-7 h-7" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar">
+                {group.items.map((fb, fIdx) => (
+                  <div key={fIdx} className="bg-brand-50/50 p-6 rounded-3xl border-2 border-transparent hover:border-cute-pink/20 transition-all">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-cute-pink/10 rounded-xl flex items-center justify-center text-cute-pink font-bold">
+                          {fb.username[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-bold text-brand-900 text-sm">{fb.username}</p>
+                          <p className="text-[10px] font-bold text-brand-400 uppercase tracking-widest">{new Date(fb.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star 
+                            key={star} 
+                            className={cn(
+                              "w-3 h-3",
+                              star <= fb.rating ? "text-cute-yellow fill-cute-yellow" : "text-brand-300"
+                            )} 
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    {fb.comment && (
+                      <p className="text-brand-700 text-sm leading-relaxed italic">
+                        "{fb.comment}"
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      ) : (
+        <div className="bg-white p-12 rounded-[3rem] border-4 border-brand-100 text-center">
+          <div className="w-20 h-20 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-6">
+             <Bot className="w-10 h-10 text-brand-300" />
+          </div>
+          <h3 className="text-2xl font-display text-brand-800 mb-2">No community feedback yet</h3>
+          <p className="text-brand-500">Be the first to share your cooking journey! 👨‍🍳</p>
+        </div>
+      )}
+    </motion.div>
+  );
+
   const renderAnalytics = () => (
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className="max-w-4xl mx-auto px-4 py-12"
     >
-      <div className="flex items-center gap-4 mb-12">
+      <div className="flex items-center gap-4 mb-8">
         <button onClick={() => setStep('home')} className="p-3 bg-white hover:bg-cute-pink/10 rounded-2xl transition-colors shadow-sm">
           <ArrowLeft className="w-6 h-6 text-cute-pink" />
         </button>
-        <h2 className="text-4xl font-display text-cute-pink">Website Analytics 📊</h2>
+        <h2 className="text-3xl font-display text-cute-pink">Website Analytics 📊</h2>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -2218,7 +2368,7 @@ export default function App() {
             <Users className="w-8 h-8 text-cute-pink" />
           </div>
           <h3 className="text-xl font-display text-brand-900 mb-1">Unique Visitors</h3>
-          <div className="text-5xl font-display text-cute-pink">
+          <div className="text-4xl font-display text-cute-pink">
             {analyticsData ? analyticsData.totalVisitors : <Loader2 className="w-10 h-10 animate-spin mx-auto" />}
           </div>
           <p className="text-brand-500 mt-2 text-sm font-medium italic">Discoveries!</p>
@@ -2229,7 +2379,7 @@ export default function App() {
             <TrendingUp className="w-8 h-8 text-cute-yellow" />
           </div>
           <h3 className="text-xl font-display text-brand-900 mb-1">Total Visits</h3>
-          <div className="text-5xl font-display text-cute-yellow">
+          <div className="text-4xl font-display text-cute-yellow">
             {analyticsData ? analyticsData.totalVisits : <Loader2 className="w-10 h-10 animate-spin mx-auto" />}
           </div>
           <p className="text-brand-500 mt-2 text-sm font-medium italic">Total sessions!</p>
@@ -2240,7 +2390,7 @@ export default function App() {
             <Timer className="w-8 h-8 text-cute-blue" />
           </div>
           <h3 className="text-xl font-display text-brand-900 mb-1">Avg. Time Spent</h3>
-          <div className="text-5xl font-display text-cute-blue">
+          <div className="text-4xl font-display text-cute-blue">
             {analyticsData ? (
               analyticsData.avgTimeSpent < 60 
                 ? `${Math.round(analyticsData.avgTimeSpent)}s`
@@ -2325,7 +2475,7 @@ export default function App() {
                           key={star} 
                           className={cn(
                             "w-4 h-4",
-                            star <= (fb.rating || 0) ? "text-cute-yellow fill-cute-yellow" : "text-brand-200"
+                            star <= (fb.rating || 0) ? "text-cute-yellow fill-cute-yellow" : "text-brand-300"
                           )} 
                         />
                       ))}
@@ -2365,7 +2515,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-50 selection:bg-brand-200">
-      <nav className="px-6 py-8 max-w-7xl mx-auto flex items-center justify-between">
+      <nav className="px-6 py-8 max-w-7xl mx-auto flex items-center justify-between gap-4">
         <div 
           className="flex items-center gap-3 cursor-pointer group"
           onClick={() => setStep('home')}
@@ -2376,59 +2526,81 @@ export default function App() {
           <span className="text-3xl font-display font-bold tracking-tight text-cute-pink">Snap2Serve</span>
         </div>
         
-        <div className="hidden md:flex items-center gap-8">
-          <button 
-            onClick={() => setStep('home')}
-            className={cn(
-              "flex items-center gap-2 text-sm font-bold transition-colors",
-              step === 'home' ? "text-cute-pink" : "text-brand-600 hover:text-cute-pink"
-            )}
-          >
-            <Home className="w-4 h-4" />
-            Home
-          </button>
-          <button 
-            onClick={() => setStep('explore')}
-            className={cn(
-              "flex items-center gap-2 text-sm font-bold transition-colors",
-              step === 'explore' ? "text-cute-pink" : "text-brand-600 hover:text-cute-pink"
-            )}
-          >
-            <Compass className="w-4 h-4" />
-            Explore
-          </button>
-          <button 
-            onClick={() => setStep('smart-suggestions')}
-            className={cn(
-              "flex items-center gap-2 text-sm font-bold transition-colors",
-              step === 'smart-suggestions' ? "text-cute-pink" : "text-brand-600 hover:text-cute-pink"
-            )}
-          >
-            <Sparkles className="w-4 h-4" />
-            Smart Suggestions
-          </button>
-          <button 
-            onClick={() => setStep('favorites')}
-            className={cn(
-              "flex items-center gap-2 text-sm font-bold transition-colors",
-              step === 'favorites' ? "text-cute-pink" : "text-brand-600 hover:text-cute-pink"
-            )}
-          >
-            <Heart className={cn("w-4 h-4", favorites.length > 0 && "fill-cute-pink text-cute-pink")} />
-            Favorites ({favorites.length})
-          </button>
+        <div className="hidden xl:flex items-center gap-1">
+          {[
+            { id: 'home', label: 'Home', icon: Home },
+            { id: 'explore', label: 'Explore', icon: Compass },
+            { id: 'smart-suggestions', label: 'Smart Suggestions', icon: Sparkles },
+            { id: 'favorites', label: `Favorites (${favorites.length})`, icon: Heart },
+            { id: 'community', label: 'Community', icon: Users, action: () => fetchCommunityFeedback() },
+          ].map((item) => (
+            <button 
+              key={item.id}
+              onClick={() => {
+                if (item.action) item.action();
+                setStep(item.id as any);
+              }}
+              className={cn(
+                "flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold transition-all relative whitespace-nowrap",
+                step === item.id 
+                  ? "text-cute-pink" 
+                  : "text-brand-600 hover:text-cute-pink hover:bg-cute-pink/5"
+              )}
+            >
+              <item.icon className={cn("w-4 h-4", item.id === 'favorites' && favorites.length > 0 && "fill-cute-pink text-cute-pink")} />
+              <span>{item.label}</span>
+              {step === item.id && (
+                <motion.div 
+                  layoutId="nav-underline"
+                  className="absolute bottom-0 left-5 right-5 h-0.5 bg-cute-pink rounded-full"
+                />
+              )}
+            </button>
+          ))}
           { (user?.role === 'admin' || user?.email === 'pranati.parandkar@gmail.com' || user?.email === 'abc@hotmail.com') && (
             <button 
               onClick={() => setStep('analytics')}
               className={cn(
-                "flex items-center gap-2 text-sm font-bold transition-colors",
-                step === 'analytics' ? "text-cute-pink" : "text-brand-600 hover:text-cute-pink"
+                "flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold transition-all relative whitespace-nowrap",
+                step === 'analytics' ? "text-cute-pink" : "text-brand-600 hover:text-cute-pink hover:bg-cute-pink/5"
               )}
             >
               <BarChart3 className="w-4 h-4" />
-              Analytics
+              <span>Statistics</span>
+              {step === 'analytics' && (
+                <motion.div 
+                  layoutId="nav-underline"
+                  className="absolute bottom-0 left-5 right-5 h-0.5 bg-cute-pink rounded-full"
+                />
+              )}
             </button>
           )}
+        </div>
+
+        {/* Medium Screen Nav (Icon based) */}
+        <div className="hidden md:flex xl:hidden items-center gap-1">
+          {[
+            { id: 'home', icon: Home, title: 'Home' },
+            { id: 'explore', icon: Compass, title: 'Explore' },
+            { id: 'smart-suggestions', icon: Sparkles, title: 'Smart' },
+            { id: 'favorites', icon: Heart, title: 'Favs' },
+            { id: 'community', icon: Users, title: 'Talk', action: () => fetchCommunityFeedback() },
+          ].map((item) => (
+            <button 
+              key={item.id}
+              onClick={() => {
+                if (item.action) item.action();
+                setStep(item.id as any);
+              }}
+              className={cn(
+                "p-3 rounded-xl transition-all",
+                step === item.id ? "bg-white text-cute-pink shadow-md" : "text-brand-400 hover:text-cute-pink"
+              )}
+              title={item.title}
+            >
+              <item.icon className={cn("w-5 h-5", item.id === 'favorites' && favorites.length > 0 && "fill-cute-pink")} />
+            </button>
+          ))}
         </div>
 
         <div className="flex items-center gap-3">
@@ -2441,8 +2613,8 @@ export default function App() {
               <div className="w-10 h-10 bg-cute-pink rounded-xl flex items-center justify-center shadow-sm">
                 <User className="w-5 h-5 text-white" />
               </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-brand-400 uppercase tracking-wider">Chef</span>
+              <div className="hidden sm:flex flex-col">
+                <span className="text-[10px] font-bold text-cute-pink uppercase tracking-wider leading-none mb-0.5">Chef</span>
                 <span className="text-sm font-bold text-brand-950 leading-none">{user.username}</span>
               </div>
               <button 
@@ -2480,59 +2652,35 @@ export default function App() {
 
       {renderLoginModal()}
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation - Slimmer and cleaner */}
       {!['detecting', 'cooking'].includes(step) && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-brand-100 px-6 py-4 flex items-center justify-around z-50">
-          <button 
-            onClick={() => setStep('home')}
-            className={cn(
-              "flex flex-col items-center gap-1 transition-colors",
-              step === 'home' ? "text-cute-pink" : "text-brand-400"
-            )}
-          >
-            <Home className="w-6 h-6" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Home</span>
-          </button>
-          <button 
-            onClick={() => setStep('explore')}
-            className={cn(
-              "flex flex-col items-center gap-1 transition-colors",
-              step === 'explore' ? "text-cute-pink" : "text-brand-400"
-            )}
-          >
-            <Compass className="w-6 h-6" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Explore</span>
-          </button>
-          <button 
-            onClick={() => setStep('smart-suggestions')}
-            className={cn(
-              "flex flex-col items-center gap-1 transition-colors",
-              step === 'smart-suggestions' ? "text-cute-pink" : "text-brand-400"
-            )}
-          >
-            <Sparkles className="w-6 h-6" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Smart</span>
-          </button>
-          <button 
-            onClick={() => setStep('favorites')}
-            className={cn(
-              "flex flex-col items-center gap-1 transition-colors",
-              step === 'favorites' ? "text-cute-pink" : "text-brand-400"
-            )}
-          >
-            <Heart className={cn("w-6 h-6", favorites.length > 0 && "fill-cute-pink")} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Favs</span>
-          </button>
-          <button 
-            onClick={() => setStep('history')}
-            className={cn(
-              "flex flex-col items-center gap-1 transition-colors",
-              step === 'history' ? "text-cute-pink" : "text-brand-400"
-            )}
-          >
-            <History className="w-6 h-6" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">History</span>
-          </button>
+        <div className="md:hidden fixed bottom-6 left-6 right-6 bg-white/90 backdrop-blur-xl border-2 border-brand-100 rounded-[2rem] px-4 py-3 flex items-center justify-around z-50 shadow-2xl">
+          {[
+            { id: 'home', icon: Home, label: 'Home' },
+            { id: 'explore', icon: Compass, label: 'Explore' },
+            { id: 'smart-suggestions', icon: Sparkles, label: 'Smart' },
+            { id: 'favorites', icon: Heart, label: 'Favs' },
+            { id: 'community', icon: Users, label: 'Talk', action: () => fetchCommunityFeedback() },
+            { id: 'history', icon: History, label: 'Logs' },
+          ].filter(item => {
+              // Hide some items if too packed, but let's keep them small first
+              return true;
+          }).map((item) => (
+             <button 
+              key={item.id}
+              onClick={() => {
+                if (item.action) item.action();
+                setStep(item.id as any);
+              }}
+              className={cn(
+                "flex flex-col items-center gap-1 transition-all",
+                step === item.id ? "text-cute-pink scale-110" : "text-brand-300"
+              )}
+            >
+              <item.icon className={cn("w-5 h-5", item.id === 'favorites' && favorites.length > 0 && "fill-cute-pink")} />
+              <span className="text-[8px] font-black uppercase tracking-tighter">{item.label}</span>
+            </button>
+          ))}
         </div>
       )}
 
@@ -2549,6 +2697,7 @@ export default function App() {
           {step === 'smart-suggestions' && renderSmartSuggestions()}
           {step === 'cooking' && renderCooking()}
           {step === 'analytics' && renderAnalytics()}
+          {step === 'community' && renderCommunityFeedback()}
         </AnimatePresence>
       </main>
 
