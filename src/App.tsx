@@ -926,9 +926,16 @@ export default function App() {
                       step="5"
                       value={preferences.maxTime}
                       onChange={(e) => setPreferences({...preferences, maxTime: parseInt(e.target.value)})}
-                      className="flex-1 accent-cute-pink h-2 bg-brand-100 rounded-full appearance-none cursor-pointer"
+                      className="flex-1 accent-cute-pink h-2 bg-brand-100 rounded-full appearance-none cursor-pointer hover:accent-cute-pink/80 transition-all"
                     />
-                    <span className="font-display text-2xl min-w-[70px] text-cute-pink">{preferences.maxTime}m</span>
+                    <motion.span 
+                      key={preferences.maxTime}
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="font-display text-2xl min-w-[70px] text-cute-pink text-right"
+                    >
+                      {preferences.maxTime}m
+                    </motion.span>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {[15, 30, 45, 60, 90, 120].map(time => (
@@ -936,12 +943,15 @@ export default function App() {
                         key={time}
                         onClick={() => setPreferences({...preferences, maxTime: time})}
                         className={cn(
-                          "px-4 py-2 rounded-xl text-xs font-bold transition-all border-2",
+                          "relative px-4 py-2 rounded-xl text-xs font-bold transition-all border-2 overflow-hidden",
                           preferences.maxTime === time 
-                            ? "bg-cute-pink text-white border-cute-pink shadow-md scale-105" 
+                            ? "bg-cute-pink text-white border-cute-pink shadow-lg shadow-cute-pink/30 scale-105" 
                             : "bg-white text-brand-400 border-brand-100 hover:border-cute-pink/30 hover:text-cute-pink"
                         )}
                       >
+                        {preferences.maxTime === time && (
+                          <motion.div layoutId="time-active-magic" className="absolute inset-0 bg-transparent" />
+                        )}
                         {time}m
                       </button>
                     ))}
@@ -1226,19 +1236,15 @@ export default function App() {
               </button>
 
               <button 
-  onClick={() => {
-    const event = new CustomEvent('open-chatbot', { 
-      detail: `I have a question about the ${selectedRecipe.title} recipe.` 
-    });
-    window.dispatchEvent(event);
-  }}
-  className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex items-center gap-3 px-6 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
->
-  <Bot className="w-7 h-7" />
-  <span className="flex-1 text-center">
-    Ask AI about this recipe
-  </span>
-</button>
+                onClick={() => {
+                  const event = new CustomEvent('open-chatbot', { detail: `I have a question about the ${selectedRecipe.title} recipe.` });
+                  window.dispatchEvent(event);
+                }}
+                className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex items-center justify-center hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
+              >
+                <Bot className="absolute left-[15%] w-7 h-7" />
+                <span>Ask AI about this recipe</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1928,17 +1934,45 @@ export default function App() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <label className="text-lg font-display text-brand-950 mb-3 block">Budget (₹)? 💸</label>
-              <div className="flex items-center gap-4">
-                <input 
-                  type="range" 
-                  min="50" 
-                  max="2000" 
-                  step="50"
-                  value={smartSuggestionsForm.budget}
-                  onChange={(e) => setSmartSuggestionsForm({...smartSuggestionsForm, budget: parseInt(e.target.value)})}
-                  className="flex-1 accent-cute-yellow h-2 bg-brand-100 rounded-full appearance-none cursor-pointer"
-                />
-                <span className="font-display text-2xl min-w-[70px] text-cute-yellow">₹{smartSuggestionsForm.budget}</span>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-4">
+                  <input 
+                    type="range" 
+                    min="50" 
+                    max="2000" 
+                    step="50"
+                    value={smartSuggestionsForm.budget}
+                    onChange={(e) => setSmartSuggestionsForm({...smartSuggestionsForm, budget: parseInt(e.target.value)})}
+                    className="flex-1 accent-cute-yellow h-2 bg-brand-100 rounded-full appearance-none cursor-pointer hover:accent-cute-yellow/80 transition-all"
+                  />
+                  <motion.span 
+                    key={smartSuggestionsForm.budget}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="font-display text-2xl min-w-[70px] text-cute-yellow text-right"
+                  >
+                    ₹{smartSuggestionsForm.budget}
+                  </motion.span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[100, 250, 500, 750, 1000, 1500].map(amount => (
+                    <button
+                      key={amount}
+                      onClick={() => setSmartSuggestionsForm({...smartSuggestionsForm, budget: amount})}
+                      className={cn(
+                        "relative px-4 py-2 rounded-xl text-xs font-bold transition-all border-2 overflow-hidden",
+                        smartSuggestionsForm.budget === amount 
+                          ? "bg-cute-yellow text-white border-cute-yellow shadow-lg shadow-cute-yellow/30 scale-105" 
+                          : "bg-white text-brand-400 border-brand-100 hover:border-cute-yellow/30 hover:text-cute-yellow"
+                      )}
+                    >
+                      {smartSuggestionsForm.budget === amount && (
+                        <motion.div layoutId="budget-active" className="absolute inset-0 bg-transparent" />
+                      )}
+                      ₹{amount}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -1953,10 +1987,17 @@ export default function App() {
                     step="5"
                     value={smartSuggestionsForm.time}
                     onChange={(e) => setSmartSuggestionsForm({...smartSuggestionsForm, time: parseInt(e.target.value)})}
-                    className="flex-1 accent-cute-pink h-2 bg-brand-100 rounded-full appearance-none cursor-pointer"
+                    className="flex-1 accent-cute-pink h-2 bg-brand-100 rounded-full appearance-none cursor-pointer hover:accent-cute-pink/80 transition-all"
                   />
-                  <span className="font-display text-2xl min-w-[70px] text-cute-pink">{smartSuggestionsForm.time}m</span>
-                </div>
+                  <motion.span 
+                    key={smartSuggestionsForm.time}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="font-display text-2xl min-w-[70px] text-cute-pink text-right"
+                  >
+                    {smartSuggestionsForm.time}m
+                  </motion.span>
+              </div>
                 <div className="flex flex-wrap gap-2">
                   {[15, 30, 45, 60, 90, 120].map(time => (
                     <button
