@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_for_dev";
 const MONGODB_URI = process.env.MONGODB_URI;
 
-// Connect to MongoDB
+// --- Connect to MongoDB ---
 console.log("Starting server with MONGODB_URI:", MONGODB_URI ? "Defined" : "Undefined");
 if (MONGODB_URI) {
   mongoose.connect(MONGODB_URI)
@@ -37,27 +37,26 @@ if (MONGODB_URI) {
     });
 }
 
+// --- Global Middleware Setup ---
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cookieParser());
 
-// Mount API routes BEFORE any static or SPA fallback handlers
-console.log("Mounting /api routes...");
-app.use("/api", (req, res, next) => {
-  // Simple logger for API calls
-  console.log(`[API REQUEST] ${req.method} ${req.url}`);
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
-}, apiRouter);
-
-app.get("/api/ping", (req, res) => {
-  res.json({ message: "pong", time: new Date().toISOString() });
 });
 
-app.get("/api/test", (req, res) => {
-  res.json({ message: "API is working directly on app" });
+// Simple Global API Debug Logger
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api')) {
+    console.log(`[GLOBAL API DEBUG] ${req.method} ${req.url} - Headers: ${JSON.stringify(req.headers['content-type'])}`);
+  }
+  next();
 });
 
-// Database Connection Check Middleware
+// --- Middleware Definitions ---
+
 const checkDbConnection = (req: any, res: any, next: any) => {
   if (mongoose.connection.readyState !== 1) {
     console.log(`❌ DB not connected for ${req.method} ${req.url}`);
@@ -69,7 +68,6 @@ const checkDbConnection = (req: any, res: any, next: any) => {
   next();
 };
 
-// Auth Middleware
 const authenticateToken = (req: any, res: any, next: any) => {
   const token = req.cookies.token;
   if (!token) return res.status(401).json({ message: "Unauthorized" });
@@ -81,7 +79,6 @@ const authenticateToken = (req: any, res: any, next: any) => {
   });
 };
 
-// Admin Middleware
 const isAdmin = async (req: any, res: any, next: any) => {
   try {
     const user = await User.findById(req.user.id);
@@ -94,8 +91,15 @@ const isAdmin = async (req: any, res: any, next: any) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+console.log("Defining API Router routes...");
 
-// --- API Routes ---
+apiRouter.get("/ping", (req, res) => {
+  res.json({ message: "pong", time: new Date().toISOString() });
+});
+
+apiRouter.get("/test", (req, res) => {
+  res.json({ message: "API is working through router" });
+});
 
 apiRouter.get("/health-check", (req, res) => {
   res.json({ status: "ok", message: "API is alive!" });
@@ -226,7 +230,8 @@ apiRouter.get("/community-feedback", checkDbConnection, async (req, res) => {
           recipeId: fb.recipeId,
           recipeTitle: fb.recipeTitle || 'Unknown Recipe',
           ratings: [],
-          allFeedbacks: []
+          allFeedbacks: [],
+          latestFeedbackDate: fb.createdAt // Already sorted by createdAt DESC
         };
       }
       
@@ -246,9 +251,10 @@ apiRouter.get("/community-feedback", checkDbConnection, async (req, res) => {
         recipeTitle: item.recipeTitle,
         averageRating: sum / item.ratings.length,
         totalReviews: item.ratings.length,
+        latestFeedbackDate: item.latestFeedbackDate,
         items: item.allFeedbacks.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       };
-    }).sort((a: any, b: any) => b.averageRating - a.averageRating).slice(0, 50);
+    }).sort((a: any, b: any) => new Date(b.latestFeedbackDate).getTime() - new Date(a.latestFeedbackDate).getTime()).slice(0, 50);
 
     res.json(result);
   } catch (error) {
@@ -334,7 +340,7 @@ apiRouter.post("/analytics/session/end", async (req, res) => {
 // Get Analytics (Admin Only)
 apiRouter.get("/analytics", authenticateToken, isAdmin, async (req, res) => {
   try {
-    const sessions: any[] = await Session.find();
+    const sessions = await Session.find().sort({ startTime: -1 });
     
     const totalVisits = sessions.length;
     
@@ -373,13 +379,26 @@ apiRouter.get("/analytics", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// Catch-all for unhandled API routes
+// --- Mount the API Router ---
+app.use("/api", apiRouter);
+
+// Database Connection check
+// (We already have checkDbConnection middleware, so we use it in routes)
+
+// Catch-all for unhandled API routes within apiRouter
 apiRouter.all("*", (req, res) => {
-  console.log(`[API DEBUG] Unhandled API request: ${req.method} ${req.url}`);
-  console.log(`[API DEBUG] Full path: ${req.baseUrl}${req.url}`);
+  console.log(`[API ROUTER 404] ${req.method} ${req.url}`);
+  res.status(404).json({ 
+    message: `API endpoint not found: ${req.method} ${req.url}`,
+    path: req.url
+  });
+});
+
+// Fallback for ANY /api request that escaped the router - ensures JSON 404
+app.all("/api/*", (req, res) => {
+  console.log(`[LEAK PROTECTION 404] ${req.method} ${req.url}`);
   res.status(404).json({ 
     message: `API route not found: ${req.method} ${req.url}`,
-    baseUrl: req.baseUrl,
     path: req.url
   });
 });
