@@ -1236,15 +1236,19 @@ export default function App() {
               </button>
 
               <button 
-                onClick={() => {
-                  const event = new CustomEvent('open-chatbot', { detail: `I have a question about the ${selectedRecipe.title} recipe.` });
-                  window.dispatchEvent(event);
-                }}
-                className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex items-center justify-center hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
-              >
-                <Bot className="absolute left-[15%] w-7 h-7" />
-                <span>Ask AI about this recipe</span>
-              </button>
+  onClick={() => {
+    const event = new CustomEvent('open-chatbot', { 
+      detail: `I have a question about the ${selectedRecipe.title} recipe.` 
+    });
+    window.dispatchEvent(event);
+  }}
+  className="w-full mt-4 bg-cute-blue text-white py-6 rounded-full font-bold text-xl relative flex items-center gap-3 px-6 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-cute-blue/20"
+>
+  <Bot className="w-7 h-7" />
+  <span className="flex-1 text-center">
+    Ask AI about this recipe
+  </span>
+</button>
             </div>
           </div>
         </div>
