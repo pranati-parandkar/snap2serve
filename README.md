@@ -55,6 +55,7 @@ Recipes are displayed to the user for selection and sharing.<br>
 8.Difficulty level indication<br>
 9.Dietary preference and allergy filtering<br>
 10.Favorites, history, and recipe sharing<br>
+11.AI chatbot assistant<br>
 
 # Advantages
 -Saves time and effort<br>
