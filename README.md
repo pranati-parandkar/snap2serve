@@ -13,23 +13,15 @@ This project addresses these issues using image-based ingredient detection and A
 
 # Project Screenshots
 
-<img src="1.jpeg" width="500"><br><br>
-
-<img src="2.jpeg" width="500"><br><br>
-
-<img src="3.jpeg" width="500"><br><br>
-
-<img src="4.jpeg" width="500"><br><br>
-
-<img src="5.jpeg" width="500"><br><br>
-
-<img src="6.jpeg" width="500"><br><br>
-
-<img src="7.jpeg" width="500"><br><br>
-
-<img src="8.jpeg" width="500"><br><br>
-
-<img src="9.jpeg" width="500"><br><br>
+<img src="images/1.jpeg" width="500"><br><br>
+<img src="images/2.jpeg" width="500"><br><br>
+<img src="images/3.jpeg" width="500"><br><br>
+<img src="images/4.jpeg" width="500"><br><br>
+<img src="images/5.jpeg" width="500"><br><br>
+<img src="images/6.jpeg" width="500"><br><br>
+<img src="images/7.jpeg" width="500"><br><br>
+<img src="images/8.jpeg" width="500"><br><br>
+<img src="images/9.jpeg" width="500"><br><br>
 
 # Technologies Used
 Frontend: React.js<br>
